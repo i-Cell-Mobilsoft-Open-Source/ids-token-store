@@ -242,56 +242,6 @@
             },
             "focused-outline": {
               "color": {
-                "leading-icon": {
-                  "color": {
-                    "fg": {
-                      "surface": {
-                        "disabled": {
-                          "value": "{smc.reference.forms.color.fg.icon.surface.disabled}",
-                          "type": "color"
-                        },
-                        "hovered": {
-                          "value": "{smc.reference.forms.color.fg.icon.surface.hovered}",
-                          "type": "color"
-                        },
-                        "pressed": {
-                          "value": "{smc.reference.forms.color.fg.icon.surface.pressed}",
-                          "type": "color"
-                        },
-                        "focused": {
-                          "value": "{smc.reference.forms.color.fg.icon.surface.focused}",
-                          "type": "color"
-                        },
-                        "default": {
-                          "value": "{smc.reference.forms.color.fg.icon.surface.default}",
-                          "type": "color"
-                        }
-                      },
-                      "light": {
-                        "default": {
-                          "value": "{smc.reference.forms.color.fg.icon.light.default}",
-                          "type": "color"
-                        },
-                        "hovered": {
-                          "value": "{smc.reference.forms.color.fg.icon.light.hovered}",
-                          "type": "color"
-                        },
-                        "pressed": {
-                          "value": "{smc.reference.forms.color.fg.icon.light.pressed}",
-                          "type": "color"
-                        },
-                        "focused": {
-                          "value": "{smc.reference.forms.color.fg.icon.light.focused}",
-                          "type": "color"
-                        },
-                        "disabled": {
-                          "value": "{smc.reference.forms.color.fg.icon.light.disabled}",
-                          "type": "color"
-                        }
-                      }
-                    }
-                  }
-                },
                 "light": {
                   "focused": {
                     "value": "{smc.reference.container.focused-outline.color.light.default}",
@@ -720,6 +670,56 @@
                 },
                 "pressed": {
                   "value": "{smc.reference.forms.color.fg.icon.surface.pressed}",
+                  "type": "color"
+                }
+              }
+            }
+          }
+        },
+        "leading-icon": {
+          "color": {
+            "fg": {
+              "surface": {
+                "disabled": {
+                  "value": "{smc.reference.forms.color.fg.icon.surface.disabled}",
+                  "type": "color"
+                },
+                "hovered": {
+                  "value": "{smc.reference.forms.color.fg.icon.surface.hovered}",
+                  "type": "color"
+                },
+                "pressed": {
+                  "value": "{smc.reference.forms.color.fg.icon.surface.pressed}",
+                  "type": "color"
+                },
+                "focused": {
+                  "value": "{smc.reference.forms.color.fg.icon.surface.focused}",
+                  "type": "color"
+                },
+                "default": {
+                  "value": "{smc.reference.forms.color.fg.icon.surface.default}",
+                  "type": "color"
+                }
+              },
+              "light": {
+                "default": {
+                  "value": "{smc.reference.forms.color.fg.icon.light.default}",
+                  "type": "color"
+                },
+                "hovered": {
+                  "value": "{smc.reference.forms.color.fg.icon.light.hovered}",
+                  "type": "color"
+                },
+                "pressed": {
+                  "value": "{smc.reference.forms.color.fg.icon.light.pressed}",
+                  "type": "color"
+                },
+                "focused": {
+                  "value": "{smc.reference.forms.color.fg.icon.light.focused}",
+                  "type": "color"
+                },
+                "disabled": {
+                  "value": "{smc.reference.forms.color.fg.icon.light.disabled}",
                   "type": "color"
                 }
               }
