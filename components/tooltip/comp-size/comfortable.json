@@ -1,5 +1,5 @@
 {
-  "description": {
+  "label": {
     "typography": {
       "line-height": {
         "value": "{smc.reference.typography.line-height.24}",
