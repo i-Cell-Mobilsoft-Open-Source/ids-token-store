@@ -2384,6 +2384,10 @@
           "pressed": {
             "value": "{smc.reference.container.color.bg.primary.darker-30}",
             "type": "color"
+          },
+          "Hello-new-workflow-we-love-you": {
+            "value": "{smc.reference.container.color.bg.primary.default}",
+            "type": "color"
           }
         },
         "error": {
