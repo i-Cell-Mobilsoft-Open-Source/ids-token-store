@@ -19,8 +19,12 @@ stages:
   - publish
 
 variables:
-  # Configure this in Settings > CI/CD > Variables with a branch, tag, or commit SHA.
-  IDS_STYLES_REF: ""
+  IDS_STYLES_REF:
+    value: ""
+    description: "Token validation only: ids-styles branch, tag or commit SHA. Does not affect publishing."
+  PUBLISH_TARGET_REPO_URL:
+    value: ""
+    description: "Publish only: HTTPS repository URL without credentials. Empty uses TARGET_REPO_URL."
 
 default:
   image: node:22-bookworm
@@ -56,6 +60,8 @@ validate_ids_styles_tokens:
 
 publish_tokens:
   stage: publish
+  environment:
+    name: publish-tokens
   needs:
     - job: parse_tokens
       artifacts: true
