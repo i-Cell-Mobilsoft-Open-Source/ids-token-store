@@ -1,36 +1,7 @@
 name: Token Pipeline
 
-# GitHub Actions megfelelője a .gitlab-ci.yml-nek.
-# A tényleges üzleti logika (parse / validate / publish) az npm scriptekben
-# és a scripts/ alatti shell/node fájlokban van — ugyanazokat futtatja ez a
-# workflow is, mint a GitLab pipeline. Ez a fájl KIZÁRÓLAG a GitHub-specifikus
-# "adapter" réteg; a .gitlab-ci.yml-t és a scripteket ez a fájl nem érinti.
-#
-# Job-onkénti megfelelés a .gitlab-ci.yml-hez képest:
-#
-#   parse_tokens                → automatikus push-ra (ugyanazok az elérési
-#                                  útvonalak, mint a GitLab `changes:` listája),
-#                                  és workflow_dispatch-re is lefut.
-#                                  A generált CSS-t ugyanúgy visszacommitolja
-#                                  a forrás branch-re, mint
-#                                  scripts/commit-generated-css.sh a GitLab-on
-#                                  — kivéve védett branch-eken (lásd lentebb).
-#
-#   validate_ids_styles_tokens  → csak manuálisan indított futtatáson
-#                                  (workflow_dispatch) jelenik meg, és emellett
-#                                  egy védett "validate-ids-styles" GitHub
-#                                  Environment-hez van kötve, ami extra
-#                                  jóváhagyást kérhet (Settings → Environments).
-#                                  Ez felel meg a GitLab
-#                                  `if: CI_PIPELINE_SOURCE == "web", when: manual`
-#                                  szabálynak.
-#
-#   publish_tokens               → MINDIG manuális jóváhagyáshoz kötött (a
-#                                  "publish-tokens" Environment-en keresztül),
-#                                  függetlenül attól, hogy push vagy
-#                                  workflow_dispatch indította-e a futtatást —
-#                                  pontosan úgy, mint a GitLab
-#                                  `when: manual` (rules nélkül) szabálya.
+# Shared scripts implement parsing, validation and publishing on both CI platforms.
+# Push generates CSS only; workflow_dispatch selects exactly one manual operation.
 
 on:
   push:
@@ -45,15 +16,31 @@ on:
       - '.github/workflows/tokens.yml'
   workflow_dispatch:
     inputs:
-      ids_styles_ref:
-        description: 'ids-styles branch/tag/SHA a validate joghoz (üresen hagyva a repo "IDS_STYLES_REF" változóját használja)'
+      operation:
+        description: 'Choose an operation: generate CSS, validate tokens, or publish CSS.'
+        required: true
+        type: choice
+        default: generate
+        options:
+          - generate
+          - validate
+          - publish
+      target_repo_url:
+        description: 'Publish only: HTTPS repository URL, without credentials. Leave empty to use TARGET_REPO_URL.'
         required: false
         type: string
+      ids_styles_ref:
+        description: 'Token validation only: Select the ids-styles branch, tag or commit SHA to compare against the generated tokens. Leave empty to use IDS_STYLES_REF. Does not affect publishing.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   # ── parse ────────────────────────────────────────────────────────────────
   parse_tokens:
-    name: parse
+    name: Generate CSS
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -72,36 +59,11 @@ jobs:
       - name: Parse design tokens
         run: npm run parse
 
-      - name: Determine branch protection status
-        id: protection
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          branch="${GITHUB_REF_NAME}"
-          # Ha az esemény nem branch push (pl. tag), ne próbáljunk visszacommitolni.
-          if [[ "${GITHUB_REF_TYPE:-branch}" != "branch" ]]; then
-            echo "protected=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # A branch-védelmi API lekérdezése; ha nem elérhető/nincs jogosultság,
-          # biztonsági okból védettnek tekintjük (nem commitolunk vissza).
-          if gh api "repos/${GITHUB_REPOSITORY}/branches/${branch}/protection" >/dev/null 2>&1; then
-            echo "protected=true" >> "$GITHUB_OUTPUT"
-          else
-            status=$?
-            if [[ $status -eq 1 ]]; then
-              echo "protected=false" >> "$GITHUB_OUTPUT"
-            else
-              echo "protected=true" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-
       - name: Commit generated CSS back to source branch
         env:
           CI_COMMIT_BRANCH: ${{ github.ref_name }}
           CI_COMMIT_SHA: ${{ github.sha }}
-          CI_COMMIT_REF_PROTECTED: ${{ steps.protection.outputs.protected }}
+          CI_COMMIT_REF_PROTECTED: ${{ github.ref_type != 'branch' || github.ref_protected }}
           CI_REPOSITORY_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           SELF_COMMIT_MESSAGE: 'chore(tokens): update generated CSS [skip ci]'
         run: bash scripts/commit-generated-css.sh
@@ -116,9 +78,10 @@ jobs:
 
   # ── validate (manuális) ──────────────────────────────────────────────────
   validate_ids_styles_tokens:
-    name: validate
+    name: Validate tokens against ids-styles
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'validate'
+    needs: parse_tokens
     environment: validate-ids-styles
     steps:
       - name: Checkout
@@ -132,8 +95,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Parse design tokens
-        run: npm run parse
+      - name: Download generated CSS from this run
+        uses: actions/download-artifact@v4
+        with:
+          name: ids_css
+          path: ids_css/
 
       - name: Validate against ids-styles
         env:
@@ -151,14 +117,16 @@ jobs:
 
   # ── publish (mindig manuális) ────────────────────────────────────────────
   publish_tokens:
-    name: publish
+    name: Publish CSS
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'publish'
     needs: parse_tokens
     environment: publish-tokens
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -177,7 +145,11 @@ jobs:
       - name: Publish CSS to target repository
         env:
           SKIP_PARSE: "true"
-          TARGET_REPO_URL: ${{ secrets.TARGET_REPO_URL }}
+          TARGET_REPO_URL: ${{ secrets.TARGET_REPO_URL || vars.TARGET_REPO_URL }}
+          PUBLISH_TARGET_REPO_URL: ${{ inputs.target_repo_url }}
+          TARGET_REPO_CREDENTIALS: ${{ secrets.TARGET_REPO_CREDENTIALS }}
+          TARGET_REPO_USERNAME: ${{ secrets.TARGET_REPO_USERNAME }}
+          TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
           TARGET_REPO_BRANCH: ${{ vars.TARGET_REPO_BRANCH }}
           TARGET_CSS_PATH: ${{ vars.TARGET_CSS_PATH }}
           TARGET_CHECKOUT_DIR: ${{ vars.TARGET_CHECKOUT_DIR }}
