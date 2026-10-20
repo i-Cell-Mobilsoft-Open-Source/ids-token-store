@@ -13,8 +13,8 @@ const alternateUrl = 'https://github.com/team/frontend.git';
 const auth = { DEFAULT_TARGET_REPO_URL: defaultUrl,
   DEFAULT_TARGET_REPO_USERNAME: 'publisher', DEFAULT_TARGET_REPO_CREDENTIALS: 'default-secret', CI: 'true' };
 
-test('empty target fields use the complete default pair', () => {
-  const result = resolveTarget({ ...auth, PUBLISH_TARGET_PROFILE: ' ', CUSTOM_TARGET_REPO_URL: ' ' });
+test('no selected profile uses the complete default pair', () => {
+  const result = resolveTarget({ ...auth, PUBLISH_TARGET_PROFILE: ' ' });
   assert.equal(result.mode, 'default');
   assert.equal(result.url, defaultUrl);
   assert.equal(result.token, 'default-secret');
@@ -57,43 +57,12 @@ test('unknown, invalid and incomplete profiles fail without a default fallback',
   assert.throws(() => resolveTarget({ ...auth, PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_CREDENTIALS: 'demo-secret' }), /profile has no target URL/);
 });
 
-test('custom targets use only the explicitly supplied URL/token pair, on any HTTPS server', () => {
-  for (const url of [alternateUrl, alternateUrl.replace(/\.git$/, ''),
-    'https://another.example/team/frontend.git', 'https://gitlab.example.com/team/other.git']) {
-    const result = resolveTarget({ ...auth, CUSTOM_TARGET_REPO_URL: url,
-      CUSTOM_TARGET_REPO_CREDENTIALS: 'custom-secret', CUSTOM_TARGET_REPO_USERNAME: 'custom-user' });
-    assert.equal(result.mode, 'custom');
-    assert.equal(result.url, url);
-    assert.equal(result.token, 'custom-secret');
-    assert.equal(result.username, 'custom-user');
-  }
-  assert.equal(resolveTarget({ CUSTOM_TARGET_REPO_URL: alternateUrl,
-    CUSTOM_TARGET_REPO_CREDENTIALS: 'custom-secret', CI: 'true' }).url, alternateUrl);
-});
-
-test('clone endpoints without .git are preserved for default, profile and custom targets', () => {
+test('clone endpoints without .git are preserved for default and profile targets', () => {
   for (const url of ['https://dev.azure.com/team/project/_git/frontend',
     'https://git-codecommit.us-east-2.amazonaws.com/v1/repos/frontend']) {
     assert.equal(resolveTarget({ ...auth, DEFAULT_TARGET_REPO_URL: url }).url, url);
     assert.equal(resolveTarget({ ...auth, PUBLISH_TARGET_PROFILE: 'DEMO',
       DEMO_TARGET_REPO_URL: url, DEMO_TARGET_REPO_CREDENTIALS: 'demo-secret' }).url, url);
-    assert.equal(resolveTarget({ ...auth, CUSTOM_TARGET_REPO_URL: url,
-      CUSTOM_TARGET_REPO_CREDENTIALS: 'custom-secret' }).url, url);
-  }
-});
-
-test('custom URL or token alone never borrows the other half from the default pair', () => {
-  for (const settings of [{ CUSTOM_TARGET_REPO_URL: alternateUrl },
-    { CUSTOM_TARGET_REPO_CREDENTIALS: 'custom-secret' }, { CUSTOM_TARGET_REPO_USERNAME: 'custom-user' },
-    { CUSTOM_TARGET_REPO_URL: alternateUrl, CUSTOM_TARGET_REPO_CREDENTIALS: ' ' }]) {
-    assert.throws(() => resolveTarget({ ...auth, ...settings }), /Custom publishing requires|empty token/);
-  }
-});
-
-test('profile selection conflicts with every custom target field', () => {
-  for (const settings of [{ CUSTOM_TARGET_REPO_URL: alternateUrl },
-    { CUSTOM_TARGET_REPO_CREDENTIALS: 'custom-secret' }, { CUSTOM_TARGET_REPO_USERNAME: 'custom-user' }]) {
-    assert.throws(() => resolveTarget({ ...auth, PUBLISH_TARGET_PROFILE: 'DEMO', ...settings }), /not both/);
   }
 });
 
@@ -103,14 +72,13 @@ test('old URL/JSON credential settings are not used as compatibility fallbacks',
   assert.throws(() => resolveTarget({ ...auth, DEFAULT_TARGET_REPO_CREDENTIALS: '', TARGET_REPO_TOKEN: 'old-secret' }), /Missing publish token/);
 });
 
-test('malformed and credential-bearing URLs are rejected in all three modes without echoing input', () => {
+test('malformed and credential-bearing URLs are rejected in both modes without echoing input', () => {
   for (const url of ['not-a-url', 'http://github.com/team/repo', 'ssh://git@github.com/team/repo',
     'https://user:secret@github.com/team/repo', 'https://github.com/team/repo?secret=secret',
     'https://github.com/team/repo#secret', 'https://github.com/team/../repo',
     'https://github.com/team/%2e%2e/repo', 'https://github.com/team/repo\\secret']) {
     for (const env of [{ ...auth, DEFAULT_TARGET_REPO_URL: url },
-      { ...auth, PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_URL: url, DEMO_TARGET_REPO_CREDENTIALS: 'demo-secret' },
-      { ...auth, CUSTOM_TARGET_REPO_URL: url, CUSTOM_TARGET_REPO_CREDENTIALS: 'custom-secret' }]) {
+      { ...auth, PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_URL: url, DEMO_TARGET_REPO_CREDENTIALS: 'demo-secret' }]) {
       assert.throws(() => resolveTarget(env), (error) => !error.message.includes('secret@') && /URL|token/.test(error.message));
     }
   }
@@ -163,7 +131,7 @@ function fixture(t) {
   const env = { ...inheritedEnv, CI: '', GITHUB_ACTIONS: '', GITLAB_CI: '',
     SKIP_PARSE: 'true', CSS_OUTPUT_DIR: '', DEFAULT_TARGET_REPO_URL: bare,
     DEFAULT_TARGET_REPO_CREDENTIALS: '', DEFAULT_TARGET_REPO_USERNAME: '',
-    PUBLISH_TARGET_PROFILE: '', CUSTOM_TARGET_REPO_URL: '', CUSTOM_TARGET_REPO_CREDENTIALS: '', CUSTOM_TARGET_REPO_USERNAME: '',
+    PUBLISH_TARGET_PROFILE: '',
     TARGET_REPO_BRANCH: '', TARGET_CSS_PATH: '', TARGET_CHECKOUT_DIR: '', TARGET_COMMIT_MESSAGE: '',
     GIT_AUTHOR_NAME: '', GIT_AUTHOR_EMAIL: '' };
   const run = (extra = {}) => spawnSync('bash', [script], { cwd: source, env: { ...env, ...extra }, encoding: 'utf8' });
@@ -188,17 +156,22 @@ test('real clone/commit/push uses the fallback, preserves other files, and is id
   assert.equal(git(f.root, '--git-dir', f.bare, 'rev-parse', 'IDS_CSS'), first);
 });
 
-for (const mode of ['profile', 'custom']) test(`${mode} target receives CSS with branch/path options and does not change the default`, (t) => {
+test('profile target receives CSS with branch/path options and does not change the default', (t) => {
   const f = fixture(t);
-  const settings = { ...(mode === 'profile' ? { PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_URL: f.other } : { CUSTOM_TARGET_REPO_URL: f.other }),
-    TARGET_REPO_BRANCH: 'release/css', TARGET_CSS_PATH: 'styles/generated', TARGET_CHECKOUT_DIR: 'custom-checkout' };
+  const settings = { PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_URL: f.other,
+    TARGET_REPO_BRANCH: 'release/css', TARGET_CSS_PATH: 'styles/generated', TARGET_CHECKOUT_DIR: 'profile-checkout' };
   let result = f.run(settings);
   assert.equal(result.status, 0, result.stderr);
-  assert.ok(result.stdout.includes(`Publish mode: ${mode}`));
+  assert.match(result.stdout, /Publish mode: profile \(profile: DEMO\)/);
   assert.ok(result.stdout.includes(f.other));
-  assert.ok(result.stdout.includes(mode === 'profile' ? 'DEMO_TARGET_REPO_CREDENTIALS' : 'CUSTOM_TARGET_REPO_CREDENTIALS'));
+  assert.match(result.stdout, /Credential setting: DEMO_TARGET_REPO_CREDENTIALS/);
   assert.match(git(f.root, '--git-dir', f.other, 'show', 'release/css:styles/generated/tokens.css'), /--ids-comp-test/);
   assert.equal(git(f.root, '--git-dir', f.bare, 'branch', '--list', 'IDS_CSS'), '');
+  const first = git(f.root, '--git-dir', f.other, 'rev-parse', 'release/css');
+  result = f.run(settings);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /already contains/);
+  assert.equal(git(f.root, '--git-dir', f.other, 'rev-parse', 'release/css'), first);
   writeFileSync(path.join(f.source, 'ids_css', 'tokens.css'), ':root { --ids-comp-test: 2px; }');
   result = f.run(settings);
   assert.equal(result.status, 0, result.stderr);
@@ -240,32 +213,60 @@ test('missing pipeline artifact, unsafe paths, invalid branch and symlinks canno
   assert.match(result.stderr, /regular files/);
 });
 
-test('custom secrets and raw invalid URL never appear in CLI logs', (t) => {
+test('default and profile secrets and raw invalid URLs never appear in CLI logs', (t) => {
   const f = fixture(t);
-  const result = f.run({ CI: 'true', CUSTOM_TARGET_REPO_URL: 'https://publisher:never-log-this@evil.example/a/b',
-    CUSTOM_TARGET_REPO_CREDENTIALS: 'never-log-this' });
-  assert.notEqual(result.status, 0);
-  assert.ok(!(result.stdout + result.stderr).includes('never-log-this'));
-  assert.ok(!(result.stdout + result.stderr).includes('evil.example'));
+  const url = 'https://publisher:never-log-this@evil.example/a/b';
+  for (const settings of [{ DEFAULT_TARGET_REPO_URL: url, DEFAULT_TARGET_REPO_CREDENTIALS: 'never-log-this' },
+    { PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_URL: url, DEMO_TARGET_REPO_CREDENTIALS: 'never-log-this' }]) {
+    const result = f.run({ ...auth, ...settings });
+    assert.notEqual(result.status, 0);
+    assert.ok(!(result.stdout + result.stderr).includes('never-log-this'));
+    assert.ok(!(result.stdout + result.stderr).includes('evil.example'));
+  }
 });
 
-test('incomplete or conflicting input fails before Git starts and never logs any token', (t) => {
+test('valid default and profile credentials remain hidden even if Git echoes the selected token', (t) => {
+  const f = fixture(t);
+  const bin = path.join(f.root, 'bin');
+  mkdirSync(bin);
+  writeFileSync(path.join(bin, 'git'), `#!/usr/bin/env node
+if (process.argv.includes('check-ref-format')) process.exit(0);
+console.log(process.env.PUBLISH_CREDENTIAL_TOKEN);
+console.error(process.env.PUBLISH_CREDENTIAL_TOKEN);
+process.exit(1);
+`, { mode: 0o755 });
+  for (const settings of [{}, { PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_URL: alternateUrl,
+    DEMO_TARGET_REPO_CREDENTIALS: 'profile-secret' }]) {
+    const result = f.run({ ...auth, ...settings, PATH: `${bin}${path.delimiter}${process.env.PATH}` });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Cannot clone target repository/);
+    assert.ok(result.stdout.includes(settings.PUBLISH_TARGET_PROFILE ? alternateUrl : defaultUrl));
+    assert.ok(!/(default-secret|profile-secret)/.test(result.stdout + result.stderr));
+  }
+});
+
+test('invalid default and profile configuration fails before Git starts and never logs any token', (t) => {
   const f = fixture(t);
   const bin = path.join(f.root, 'bin');
   const marker = path.join(f.root, 'git-invoked');
   mkdirSync(bin);
   writeFileSync(path.join(bin, 'git'), '#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.env.GIT_INVOCATION_MARKER, "invoked"); process.exit(99);\n', { mode: 0o755 });
-  for (const settings of [{ CUSTOM_TARGET_REPO_URL: alternateUrl },
-    { CUSTOM_TARGET_REPO_CREDENTIALS: 'custom-secret' },
+  const before = [f.bare, f.other].map((repo) => git(f.root, '--git-dir', repo, 'show-ref'));
+  for (const settings of [{ DEFAULT_TARGET_REPO_URL: '' },
+    { DEFAULT_TARGET_REPO_CREDENTIALS: '' },
     { PUBLISH_TARGET_PROFILE: 'UNKNOWN' },
-    { PUBLISH_TARGET_PROFILE: 'DEMO', CUSTOM_TARGET_REPO_CREDENTIALS: 'custom-secret' },
-    { CUSTOM_TARGET_REPO_URL: alternateUrl, CUSTOM_TARGET_REPO_CREDENTIALS: 'secret\npassword=injected' }]) {
+    { PUBLISH_TARGET_PROFILE: 'bad-profile' },
+    { PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_URL: alternateUrl },
+    { PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_CREDENTIALS: 'profile-secret' },
+    { PUBLISH_TARGET_PROFILE: 'DEMO', DEMO_TARGET_REPO_URL: alternateUrl, DEMO_TARGET_REPO_CREDENTIALS: 'secret\npassword=injected' },
+    { DEFAULT_TARGET_REPO_CREDENTIALS: 'secret\npassword=injected' }]) {
     const result = f.run({ ...auth, ...settings, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
       GIT_INVOCATION_MARKER: marker });
     assert.notEqual(result.status, 0);
     assert.equal(existsSync(marker), false);
-    assert.ok(!/(default-secret|custom-secret|password=injected)/.test(result.stdout + result.stderr));
+    assert.ok(!/(default-secret|profile-secret|password=injected)/.test(result.stdout + result.stderr));
   }
+  assert.deepEqual([f.bare, f.other].map((repo) => git(f.root, '--git-dir', repo, 'show-ref')), before);
 });
 
 test('real Git credential protocol invokes the helper and refuses other repository paths', () => {

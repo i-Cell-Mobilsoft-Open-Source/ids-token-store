@@ -1,10 +1,7 @@
 // These tests exercise routing expressions from the checked-in configuration.
 // They do not simulate a hosted Actions runner or a GitLab scheduler.
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolveTarget } from './publish-css.mjs';
 import vm from 'node:vm';
 import test from 'node:test';
@@ -47,7 +44,6 @@ test('publish and validation independently consume CSS from the same workflow ru
   assert.doesNotMatch(ghJob('publish_tokens'), /continue-on-error/);
   assert.match(ghJob('publish_tokens'), /persist-credentials: false/);
   assert.match(ghJob('publish_tokens'), /DEFAULT_TARGET_REPO_CREDENTIALS: \$\{\{ secrets.DEFAULT_TARGET_REPO_CREDENTIALS \}\}/);
-  assert.match(ghJob('publish_tokens'), /CUSTOM_TARGET_REPO_CREDENTIALS: \$\{\{ inputs.custom_target_repo_credentials \}\}/);
   assert.match(ghJob('validate_ids_styles_tokens'), /inputs.ids_styles_ref \|\| vars.IDS_STYLES_REF/);
 });
 
@@ -59,6 +55,8 @@ test('GitLab publish remains manual in automatic and web pipelines, independent 
   assert.match(publish, /when: manual/);
   assert.match(publish, /job: parse_tokens\n\s+artifacts: true/);
   assert.match(publish, /SKIP_PARSE: "true"/);
+  assert.match(publish, /environment:\n\s+name: publish-tokens/);
+  assert.match(publish, /allow_failure: true/);
   assert.doesNotMatch(publish, /validate_ids_styles_tokens/);
   const validation = glJob('validate_ids_styles_tokens');
   assert.match(validation, /needs: \[\]/);
@@ -67,9 +65,10 @@ test('GitLab publish remains manual in automatic and web pipelines, independent 
   assert.match(validation, /allow_failure: false/);
   assert.match(validation, /when: always/);
   assert.match(validation, /token-diff-report.json/);
-  for (const key of ['PUBLISH_TARGET_PROFILE', 'CUSTOM_TARGET_REPO_URL', 'CUSTOM_TARGET_REPO_CREDENTIALS', 'CUSTOM_TARGET_REPO_USERNAME']) {
-    assert.match(gitlab, new RegExp(`${key}:\\n\\s+value: \"\"`));
-  }
+  assert.match(gitlab, /PUBLISH_TARGET_PROFILE:\n\s+value: ""/);
+  assert.match(glJob('parse_tokens'), /ids_css\//);
+  assert.match(glJob('parse_tokens'), /expire_in: 7 days/);
+  assert.match(validation, /expire_in: 7 days/);
 });
 
 test('source CSS commits skip protected branches, rulesets and tags using GitHub context', () => {
@@ -87,20 +86,19 @@ test('source CSS commits skip protected branches, rulesets and tags using GitHub
   }
 });
 
-function githubPublishEnv(inputs) {
+function githubPublishEnv(inputs, { vars = {}, secrets = {} } = {}) {
   const context = {
     vars: { DEFAULT_TARGET_REPO_URL: 'https://gitlab.example.com/team/default.git',
       DEMO_TARGET_REPO_URL: 'https://github.com/team/demo.git',
-      SANDBOX_TARGET_REPO_URL: 'https://sandbox.example.com/team/frontend.git' },
+      SANDBOX_TARGET_REPO_URL: 'https://sandbox.example.com/team/frontend.git', ...vars },
     secrets: { DEFAULT_TARGET_REPO_CREDENTIALS: 'default-secret', DEMO_TARGET_REPO_CREDENTIALS: 'demo-secret',
-      SANDBOX_TARGET_REPO_CREDENTIALS: 'sandbox-secret' },
-    inputs: { target_profile: '', custom_target_repo_url: '', custom_target_repo_credentials: '', custom_target_repo_username: '', ...inputs },
+      SANDBOX_TARGET_REPO_CREDENTIALS: 'sandbox-secret', ...secrets },
+    inputs: { target_profile: '', ...inputs },
     format: (template, value) => template.replace('{0}', value),
   };
   const env = { CI: 'true' };
   for (const key of ['DEFAULT_TARGET_REPO_URL', 'DEFAULT_TARGET_REPO_CREDENTIALS', 'DEFAULT_TARGET_REPO_USERNAME',
-    'PUBLISH_TARGET_PROFILE', 'PUBLISH_PROFILE_URL', 'PUBLISH_PROFILE_CREDENTIALS', 'PUBLISH_PROFILE_USERNAME',
-    'CUSTOM_TARGET_REPO_URL', 'CUSTOM_TARGET_REPO_CREDENTIALS', 'CUSTOM_TARGET_REPO_USERNAME']) {
+    'PUBLISH_TARGET_PROFILE', 'PUBLISH_PROFILE_URL', 'PUBLISH_PROFILE_CREDENTIALS', 'PUBLISH_PROFILE_USERNAME']) {
     const expression = ghJob('publish_tokens').match(new RegExp(`^          ${key}: \\$\\{\\{(.+?)\\}\\}`, 'm'))?.[1];
     assert.ok(expression, `Missing GitHub adapter parameter ${key}`);
     env[key] = vm.runInNewContext(expression, context) || '';
@@ -108,35 +106,37 @@ function githubPublishEnv(inputs) {
   return env;
 }
 
-test('GitHub adapter selects default, multiple saved profiles and custom credentials from actual workflow expressions', () => {
-  assert.equal(resolveTarget(githubPublishEnv({})).token, 'default-secret');
+test('GitHub adapter selects default and multiple saved profiles from actual workflow expressions without fallback', () => {
+  const defaultTarget = resolveTarget(githubPublishEnv({}));
+  assert.equal(defaultTarget.url, 'https://gitlab.example.com/team/default.git');
+  assert.equal(defaultTarget.token, 'default-secret');
   for (const profile of ['DEMO', 'SANDBOX']) {
     const result = resolveTarget(githubPublishEnv({ target_profile: profile }));
     assert.equal(result.profile, profile);
     assert.equal(result.token, `${profile.toLowerCase()}-secret`);
+    assert.equal(result.url, profile === 'DEMO' ? 'https://github.com/team/demo.git' : 'https://sandbox.example.com/team/frontend.git');
   }
-  const custom = resolveTarget(githubPublishEnv({ custom_target_repo_url: 'https://custom.example/team/frontend.git',
-    custom_target_repo_credentials: 'custom-secret' }));
-  assert.equal(custom.mode, 'custom');
-  assert.equal(custom.token, 'custom-secret');
   assert.throws(() => resolveTarget(githubPublishEnv({ target_profile: 'UNKNOWN' })), /profile has no target URL/);
-  assert.throws(() => resolveTarget(githubPublishEnv({ custom_target_repo_url: 'https://custom.example/team/frontend.git' })), /requires both/);
+  assert.throws(() => resolveTarget(githubPublishEnv({ target_profile: 'DEMO' }, {
+    secrets: { DEMO_TARGET_REPO_CREDENTIALS: '' },
+  })), /Missing publish token.*DEMO_TARGET_REPO_CREDENTIALS/);
+  assert.throws(() => resolveTarget(githubPublishEnv({ target_profile: 'DEMO' }, {
+    vars: { DEMO_TARGET_REPO_URL: '' },
+  })), /profile has no target URL/);
+  assert.throws(() => resolveTarget(githubPublishEnv({}, {
+    secrets: { DEFAULT_TARGET_REPO_CREDENTIALS: '' },
+  })), /Missing publish token.*DEFAULT_TARGET_REPO_CREDENTIALS/);
+  assert.deepEqual(resolveTarget(githubPublishEnv({})), defaultTarget);
 });
 
-test('GitHub masks the custom token before any step can display it in environment values', (t) => {
-  const body = ghJob('publish_tokens');
-  const marker = body.indexOf('- name: Mask custom publish token in logs');
-  assert.ok(marker >= 0);
-  assert.doesNotMatch(body.slice(0, marker), /- name:/);
-  const block = body.slice(marker, body.indexOf('- name: Checkout', marker));
-  assert.doesNotMatch(block, /env:|\$\{\{ inputs\./);
-  const command = block.split('run: |\n')[1].split('\n').filter((line) => line.startsWith('          '))
-    .map((line) => line.slice(10)).join('\n');
-  const directory = mkdtempSync(path.join(tmpdir(), 'publish-mask-test-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const eventPath = path.join(directory, 'event.json');
-  writeFileSync(eventPath, JSON.stringify({ inputs: { custom_target_repo_credentials: 'one-off%token\r\nsecond-line' } }));
-  const result = spawnSync('bash', ['-c', command], { env: { ...process.env, GITHUB_EVENT_PATH: eventPath }, encoding: 'utf8' });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, '::add-mask::one-off%25token%0D%0Asecond-line\n');
+test('CI configuration exposes only saved target selection and no plain-text credential inputs', () => {
+  const inputNames = [...github.matchAll(/^      ([a-z_]+):$/gm)].map((match) => match[1]);
+  assert.deepEqual(inputNames, ['operation', 'target_profile', 'ids_styles_ref']);
+  const variables = gitlab.match(/^variables:\n([\s\S]*?)(?=^\S)/m)?.[1];
+  assert.ok(variables);
+  assert.deepEqual([...variables.matchAll(/^  ([A-Z_]+):$/gm)].map((match) => match[1]),
+    ['IDS_STYLES_REF', 'PUBLISH_TARGET_PROFILE']);
+  for (const config of [github, gitlab]) {
+    assert.doesNotMatch(config, /custom_target_repo|CUSTOM_TARGET_REPO|Mask custom publish token/);
+  }
 });
