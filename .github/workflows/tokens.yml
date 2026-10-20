@@ -25,8 +25,20 @@ on:
           - generate
           - validate
           - publish
-      target_repo_url:
-        description: 'Publish only: HTTPS repository URL, without credentials. Leave empty to use TARGET_REPO_URL.'
+      target_profile:
+        description: 'Publish only: Saved profile name, e.g. DEMO. Leave all target fields empty to use DEFAULT_TARGET_REPO_URL and DEFAULT_TARGET_REPO_CREDENTIALS.'
+        required: false
+        type: string
+      custom_target_repo_url:
+        description: 'Publish only: One-off HTTPS clone URL. Supply its custom token too; leave target_profile empty.'
+        required: false
+        type: string
+      custom_target_repo_credentials:
+        description: 'Publish only: One-off token for the custom URL. Plain-text input: may be visible in workflow run details.'
+        required: false
+        type: string
+      custom_target_repo_username:
+        description: 'Publish only: Optional HTTPS username for the custom token (default: git).'
         required: false
         type: string
       ids_styles_ref:
@@ -123,6 +135,20 @@ jobs:
     needs: parse_tokens
     environment: publish-tokens
     steps:
+      # Read the event file instead of putting the raw token in this step's env
+      # or run text: the runner displays those before executing add-mask.
+      - name: Mask custom publish token in logs
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+          const token = event.inputs?.custom_target_repo_credentials || '';
+          if (token) {
+            const escaped = token.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+            process.stdout.write(`::add-mask::${escaped}\n`);
+          }
+          NODE
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -145,11 +171,16 @@ jobs:
       - name: Publish CSS to target repository
         env:
           SKIP_PARSE: "true"
-          TARGET_REPO_URL: ${{ secrets.TARGET_REPO_URL || vars.TARGET_REPO_URL }}
-          PUBLISH_TARGET_REPO_URL: ${{ inputs.target_repo_url }}
-          TARGET_REPO_CREDENTIALS: ${{ secrets.TARGET_REPO_CREDENTIALS }}
-          TARGET_REPO_USERNAME: ${{ secrets.TARGET_REPO_USERNAME }}
-          TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+          DEFAULT_TARGET_REPO_URL: ${{ vars.DEFAULT_TARGET_REPO_URL }}
+          DEFAULT_TARGET_REPO_CREDENTIALS: ${{ secrets.DEFAULT_TARGET_REPO_CREDENTIALS }}
+          DEFAULT_TARGET_REPO_USERNAME: ${{ vars.DEFAULT_TARGET_REPO_USERNAME }}
+          PUBLISH_TARGET_PROFILE: ${{ inputs.target_profile }}
+          PUBLISH_PROFILE_URL: ${{ vars[format('{0}_TARGET_REPO_URL', inputs.target_profile)] }}
+          PUBLISH_PROFILE_CREDENTIALS: ${{ secrets[format('{0}_TARGET_REPO_CREDENTIALS', inputs.target_profile)] }}
+          PUBLISH_PROFILE_USERNAME: ${{ vars[format('{0}_TARGET_REPO_USERNAME', inputs.target_profile)] }}
+          CUSTOM_TARGET_REPO_URL: ${{ inputs.custom_target_repo_url }}
+          CUSTOM_TARGET_REPO_CREDENTIALS: ${{ inputs.custom_target_repo_credentials }}
+          CUSTOM_TARGET_REPO_USERNAME: ${{ inputs.custom_target_repo_username }}
           TARGET_REPO_BRANCH: ${{ vars.TARGET_REPO_BRANCH }}
           TARGET_CSS_PATH: ${{ vars.TARGET_CSS_PATH }}
           TARGET_CHECKOUT_DIR: ${{ vars.TARGET_CHECKOUT_DIR }}

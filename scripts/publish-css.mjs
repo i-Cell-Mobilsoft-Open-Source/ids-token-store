@@ -13,82 +13,70 @@ const inCi = (env) => [env.CI, env.GITHUB_ACTIONS, env.GITLAB_CI].some(
 );
 
 // Normalize clone URLs without embedding credentials in Git arguments/config.
-function repository(raw, { legacy = false, local = false } = {}) {
+function repository(raw, { local = false } = {}) {
   if (local && (path.isAbsolute(raw) || raw.startsWith('file:///'))) {
     const localPath = raw.startsWith('file:') ? fileURLToPath(raw) : raw;
-    return { url: pathToFileURL(path.resolve(localPath)).href };
+    return pathToFileURL(path.resolve(localPath)).href;
   }
-  // Keep existing SSH defaults usable with a preconfigured deploy key/agent.
-  // Manual destination selection uses credential-free HTTPS only.
-  if (legacy && /^git@[A-Za-z0-9.-]+:/.test(raw)) raw = raw.replace(/^git@([^:]+):/, 'ssh://git@$1/');
   let url;
   try { url = new URL(raw); } catch { fail('Invalid target repository URL. Use an HTTPS clone URL.'); }
-  const ssh = legacy && url.protocol === 'ssh:' && url.username === 'git' && !url.password;
-  if ((!ssh && (url.protocol !== 'https:' || !raw.startsWith('https://'))) || /[\s\\?#]/.test(raw) || /%/.test(url.pathname) ||
+  if (url.protocol !== 'https:' || !raw.startsWith('https://') || /[\s\\?#]/.test(raw) || /%/.test(url.pathname) ||
       !/^\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+\/?$/.test(url.pathname) ||
       /\/(?:\.{1,2})(?:\/|$)/.test(raw)) {
     fail('Invalid target repository URL. Use HTTPS with an exact repository path, without query or fragment.');
   }
-  if (!legacy && (url.username || url.password)) {
-    fail('Target repository URLs must not contain a username, token or password. Configure publish secrets instead.');
+  if (url.username || url.password) {
+    fail('Target repository URLs must not contain a username, token or password. Store the token separately.');
   }
-  const username = ssh ? '' : decodeURIComponent(url.username);
-  const token = ssh ? '' : decodeURIComponent(url.password);
-  if (!ssh) url.username = '';
-  url.password = '';
   url.pathname = url.pathname.replace(/\/$/, '');
-  return { url: url.href, username, token };
+  return url.href;
 }
 
 export function resolveTarget(env) {
-  const local = !inCi(env);
-  const defaultTarget = env.TARGET_REPO_URL?.trim()
-    ? repository(env.TARGET_REPO_URL.trim(), { legacy: true, local }) : undefined;
-  const override = env.PUBLISH_TARGET_REPO_URL?.trim();
-  const target = override ? repository(override, { local }) : defaultTarget;
-  if (!target) fail('TARGET_REPO_URL must be configured, or supply PUBLISH_TARGET_REPO_URL.');
-  // Existing URL credentials remain usable for the configured default only.
-  // An override can never redirect those credentials to another repository.
-  const legacy = target.url === defaultTarget?.url ? defaultTarget : {};
-  const sameServer = defaultTarget && new URL(target.url).origin === new URL(defaultTarget.url).origin;
-  let username = sameServer ? env.TARGET_REPO_USERNAME || legacy.username || '' : '';
-  let token = sameServer ? env.TARGET_REPO_TOKEN || legacy.token || '' : '';
-  if (env.TARGET_REPO_CREDENTIALS?.trim()) {
-    // Keep the credential and its issuer together in one secret. Changing a
-    // manual destination can never rebind an existing secret to another server.
-    let credentials;
-    let issuer;
-    try {
-      credentials = JSON.parse(env.TARGET_REPO_CREDENTIALS);
-      issuer = new URL(credentials.origin);
-    } catch {
-      fail('TARGET_REPO_CREDENTIALS must be a JSON secret with origin, username and token.');
+  const profile = (env.PUBLISH_TARGET_PROFILE || '').trim();
+  const customUrl = (env.CUSTOM_TARGET_REPO_URL || '').trim();
+  const customToken = env.CUSTOM_TARGET_REPO_CREDENTIALS || '';
+  const customUsername = (env.CUSTOM_TARGET_REPO_USERNAME || '').trim();
+  const custom = Boolean(customUrl || customToken || customUsername);
+  if (profile && custom) fail('Choose a saved profile OR a custom URL/token pair, not both.');
+
+  let mode = 'default';
+  let settings;
+  let credentialName = 'DEFAULT_TARGET_REPO_CREDENTIALS';
+  if (profile) {
+    if (!/^[A-Z][A-Z0-9_]*$/.test(profile)) {
+      fail('PUBLISH_TARGET_PROFILE must start with A-Z and contain only uppercase letters, digits and underscores.');
     }
-    if (issuer.protocol !== 'https:' || issuer.username || issuer.password ||
-        issuer.pathname !== '/' || issuer.search || issuer.hash ||
-        typeof credentials.username !== 'string' || !credentials.username ||
-        typeof credentials.token !== 'string' || !credentials.token) {
-      fail('TARGET_REPO_CREDENTIALS requires an HTTPS origin without a path or credentials, plus a nonempty username and token.');
-    }
-    if (new URL(target.url).origin === issuer.origin) {
-      ({ username, token } = credentials);
-    } else if (!sameServer) {
-      fail('No matching credentials for the selected server. Configure TARGET_REPO_CREDENTIALS with that server origin and its own token; no default credentials were forwarded.');
-    }
+    mode = 'profile';
+    credentialName = `${profile}_TARGET_REPO_CREDENTIALS`;
+    // GitHub's adapter supplies only the selected vars/secret. GitLab and local
+    // use read the same named profile directly from the environment.
+    const prefix = Object.hasOwn(env, 'PUBLISH_PROFILE_URL') ? 'PUBLISH_PROFILE' : `${profile}_TARGET_REPO`;
+    settings = { url: env[`${prefix}_URL`], token: env[`${prefix}_CREDENTIALS`], username: env[`${prefix}_USERNAME`] };
+  } else if (custom) {
+    mode = 'custom';
+    credentialName = 'CUSTOM_TARGET_REPO_CREDENTIALS';
+    if (!customUrl) fail('Custom publishing requires both CUSTOM_TARGET_REPO_URL and CUSTOM_TARGET_REPO_CREDENTIALS.');
+    settings = { url: customUrl, token: customToken, username: customUsername };
+  } else {
+    settings = { url: env.DEFAULT_TARGET_REPO_URL, token: env.DEFAULT_TARGET_REPO_CREDENTIALS, username: env.DEFAULT_TARGET_REPO_USERNAME };
   }
-  if (Boolean(username) !== Boolean(token) || /[\r\n\0]/.test(username + token)) {
-    fail('Publish credentials require both a username and token, without line breaks or NUL bytes. Check TARGET_REPO_CREDENTIALS or TARGET_REPO_USERNAME/TARGET_REPO_TOKEN.');
+  if (!settings.url?.trim()) {
+    fail(mode === 'profile' ? 'Selected profile has no target URL. Configure its <PROFILE>_TARGET_REPO_URL variable.' : 'DEFAULT_TARGET_REPO_URL must be configured.');
   }
-  if (target.url.startsWith('file:') && (username || token)) {
-    fail('Local test repositories must not receive publish credentials.');
+  const url = repository(settings.url.trim(), { local: !inCi(env) });
+  const token = settings.token || '';
+  const username = (settings.username || '').trim() || 'git';
+  if (/[\r\n\0]/.test(username + token) || (token && !token.trim())) {
+    fail('Publish username and token must not contain line breaks, NUL bytes or an empty token.');
   }
-  if (target.url.startsWith('ssh:') && (username || token)) {
-    fail('An SSH default uses a deploy key/agent, not TARGET_REPO_USERNAME or TARGET_REPO_TOKEN.');
+  if (url.startsWith('file:')) {
+    if (token) fail('Local test repositories must not receive publish credentials.');
+  } else if (!token) {
+    if (mode === 'custom') fail('Custom publishing requires both CUSTOM_TARGET_REPO_URL and CUSTOM_TARGET_REPO_CREDENTIALS.');
+    fail(`Missing publish token. Configure ${credentialName} for the selected destination; no other credential is used as fallback.`);
   }
-  if (inCi(env) && !token && !target.url.startsWith('ssh:')) {
-    fail('Missing publish credentials for the selected server. Use TARGET_REPO_USERNAME and TARGET_REPO_TOKEN on the default server, or TARGET_REPO_CREDENTIALS with the selected HTTPS origin, username and token.');
-  }
-  return { url: target.url, username, token };
+  return { mode, profile, credentialName, url, username, token };
 }
 
 // Git credential protocol: pipe secrets only to the selected HTTPS host AND path.
@@ -154,7 +142,6 @@ export function publish(env = process.env, root = process.cwd()) {
   }
   Object.assign(gitEnv, {
     GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0',
-    GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ClearAllForwardings=yes -o ForwardAgent=no -o ForwardX11=no',
     GIT_AUTHOR_NAME: env.GIT_AUTHOR_NAME || 'token-pipeline',
     GIT_AUTHOR_EMAIL: env.GIT_AUTHOR_EMAIL || 'token-pipeline@example.invalid',
     GIT_COMMITTER_NAME: env.GIT_AUTHOR_NAME || 'token-pipeline',
@@ -171,7 +158,6 @@ export function publish(env = process.env, root = process.cwd()) {
     '-c', 'credential.useHttpPath=true', '-c', 'http.extraHeader=',
     '-c', 'http.followRedirects=false', '-c', 'http.sslVerify=true',
     '-c', 'protocol.allow=never', '-c', 'protocol.https.allow=always',
-    '-c', `protocol.ssh.allow=${target.url.startsWith('ssh:') ? 'always' : 'never'}`,
     '-c', `protocol.file.allow=${target.url.startsWith('file:') ? 'always' : 'never'}`,
     '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgSign=false',
   ];
@@ -182,6 +168,11 @@ export function publish(env = process.env, root = process.cwd()) {
     return result;
   };
   git(['check-ref-format', '--branch', branch], root, { message: 'TARGET_REPO_BRANCH is not a valid branch name.' });
+  const publicValue = (value) => JSON.stringify(target.token ? value.replaceAll(target.token, '***') : value);
+  console.log(`Publish mode: ${target.mode}${target.profile ? ` (profile: ${target.profile})` : ''}`);
+  console.log(`Target repository URL: ${publicValue(target.url)}`);
+  console.log(`Credential setting: ${target.credentialName}`);
+  console.log(`Target branch: ${publicValue(branch)}; CSS path: ${publicValue(cssPath)}`);
   rmSync(checkout, { recursive: true, force: true });
   git(['clone', '--quiet', '--', target.url, checkout], root, {
     message: 'Cannot clone target repository. Check its URL, TLS certificate, token read access and repository availability. Redirects are disabled; use the canonical clone URL.',
