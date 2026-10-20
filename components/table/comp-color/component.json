@@ -306,6 +306,12 @@
               "value": "{smc.reference.container.color.border.surface.transparent.0}",
               "type": "color"
             }
+          },
+          "primary": {
+            "default": {
+              "value": "{smc.reference.container.color.border.surface.transparent.0}",
+              "type": "color"
+            }
           }
         }
       }
