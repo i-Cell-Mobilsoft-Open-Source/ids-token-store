@@ -31,53 +31,92 @@ npm run publish
 
 A parser bemeneti gyökerét a `FIGMA_INPUT_DIR`, kimenetét a `CSS_OUTPUT_DIR` írhatja felül (alapérték: `ids_css`). Üres tokenbemenetnél a parser továbbra is sikeresen leáll. Helyileg az `npm run publish` előbb parse-ol; a CI a saját futtatásának CSS-artifactját használja `SKIP_PARSE=true` mellett. Ha ez az artifact hiányzik, a publish hibával leáll.
 
-## Publikálási cél és biztonságos hitelesítés
+## Publikálási cél: default, mentett profil és alkalmi cél
 
-A cél kiválasztása mindkét platformon azonos:
+A publish háromféle URL–token párt tud kiválasztani. A cél URL-je külön, látható változóban tárolható és javítható; a mentett token secret marad. A `CREDENTIALS` értéke minden esetben **a nyers token**, nem JSON és nem hitelesítést tartalmazó URL.
 
-1. Ha a manuális `PUBLISH_TARGET_REPO_URL` paraméter üres, a meglévő `TARGET_REPO_URL` használatos. GitHubon a felületi mező neve `target_repo_url`.
-2. Tetszőleges, technikailag érvényes HTTPS Git clone URL megadható, előzetes repository-regisztráció nélkül. A felülírás csak az aktuális publish-futtatásra vonatkozik; a konfigurált default URL-t nem módosítja.
-3. Az URL nem tartalmazhat felhasználónevet, jelszót, tokent, queryt vagy fragmentet. Példa: `https://github.com/example/frontend.git`.
-   A szolgáltató által megadott clone útvonalat használd; a script nem fűz hozzá automatikusan `.git` végződést.
-4. A hitelesítésnek a kiválasztott repositoryhoz olvasási és írási jogosultság kell. Ezt a cél Git-szerver ellenőrzi; megfelelő jogosultság nélkül a clone vagy a push hibával leáll.
+| Mód | URL | Token | Indításkor megadandó |
+|-----|-----|-------|---------------------|
+| Default | `DEFAULT_TARGET_REPO_URL` változó | `DEFAULT_TARGET_REPO_CREDENTIALS` secret | Minden célválasztó mező üres |
+| Mentett profil, például `DEMO` | `DEMO_TARGET_REPO_URL` változó | `DEMO_TARGET_REPO_CREDENTIALS` secret | Profilnév: `DEMO` |
+| Alkalmi cél | `CUSTOM_TARGET_REPO_URL` kézi paraméter | `CUSTOM_TARGET_REPO_CREDENTIALS` kézi paraméter | Az URL és a saját tokenje együtt |
 
-### Hitelesítés szerverváltáskor
+A default vagy profil opcionális HTTPS-felhasználóneve a `DEFAULT_TARGET_REPO_USERNAME`, illetve `<PROFIL>_TARGET_REPO_USERNAME` látható változóban adható meg. Az alkalmi célhoz a `CUSTOM_TARGET_REPO_USERNAME` tartozik. Ha a kiválasztott párhoz nincs felhasználónév megadva, az alapérték `git`; ez GitHub és GitLab personal access tokenekkel használható. Olyan tokennél, amely konkrét felhasználónevet igényel, add meg azt a kiválasztott cél saját username-mezőjében.
 
-A meglévő `TARGET_REPO_USERNAME` és `TARGET_REPO_TOKEN` secretek a `TARGET_REPO_URL` HTTPS-szerveréhez tartoznak. Ugyanazon szerveren más repositoryhoz is használhatók, ha a token ott is rendelkezik a szükséges jogokkal. Más protokollra, hostra vagy portra a script nem továbbítja őket.
+### Alapértelmezett pár
 
-Ha másik szerverhez tartozó hitelesítésre van szükség, a **`TARGET_REPO_CREDENTIALS` CI-secretben** add meg együtt a token kibocsátó szerverét és a hitelesítési adatokat. Egyetlen JSON objektumot használj, repositorylista nélkül:
+A CI beállításaiban egyszer hozd létre:
 
-```json
-{"origin":"https://github.com","username":"publisher","token":"REPLACE_IN_CI_SECRET"}
+```text
+Változó: DEFAULT_TARGET_REPO_URL = https://github.com/example/frontend.git
+Secret:  DEFAULT_TARGET_REPO_CREDENTIALS = a célhoz tartozó nyers token
 ```
 
-Ez csak formátumpélda: a valódi tokent kizárólag a CI secretkezelőjében tárold, ne fájlban vagy manuális workflow-/job-inputban. Az `origin` a tokenhez tartozó HTTPS-szerver protokollja, hostja és opcionális portja; repositoryútvonalat nem tartalmazhat. A szerver adata és a token egy secretet alkot, így a manuális cél-URL nem kötheti át a meglévő tokent másik szerverhez.
+Ha publishkor a profil és az összes alkalmi célmező üres, ide történik a publikálás. A default párt más mód kiválasztásakor nem szükséges konfigurálni.
 
-Ha a kiválasztott cél originje egyezik a JSON-secret originjével, ezt a hitelesítést használja. Egyébként kizárólag a default szerveren használható a meglévő default hitelesítés. Így egy másik szerverhez beállított secret mellett az üres célmező továbbra is a default célhoz tartozó hitelesítést használhatja. Hibás secret vagy a kiválasztott szerverhez hiányzó hitelesítés esetén egyértelmű hiba keletkezik; sikertelen Git-művelet után nincs más tokennel történő próbálkozás. Ha nincs konfigurált `TARGET_REPO_URL`, a manuálisan megadott HTTPS-célhoz a JSON-secret szükséges, mert a külön username/token pár szervere nem állapítható meg biztonságosan.
+### Több mentett profil
 
-Ez a beállítás a hitelesítés szerverhez kötését szolgálja: sem célrepositorykat, sem engedélyezett célok listáját nem kell konfigurálni. Bármely repository használható az adott szerveren, amennyiben a token jogosult rá.
+Minden profilhoz önálló változó–secret párost hozz létre, például:
 
-A script csak a kiválasztott HTTPS hosthoz és repositoryútvonalhoz adja át a hitelesítést a Git credential protokollján. Nem ír tokent a clone URL-be, Git-konfigurációba vagy parancssori argumentumba. Letiltja a HTTP-átirányításokat, az örökölt Git credential helpereket, HTTP fejléceket, URL-átírásokat és Git trace kimenetet. A TLS-ellenőrzés aktív; belső CA esetén `GIT_SSL_CAINFO` használható. A célrepository nyers hibakimenete nem kerül a CI-logba; helyette a clone-, commit- vagy push-hiba okának ellenőrzéséhez ad útmutatást.
+```text
+Változó: DEMO_TARGET_REPO_URL = https://github.com/example/demo-frontend.git
+Secret:  DEMO_TARGET_REPO_CREDENTIALS = a demo repository tokenje
 
-**Meglévő konfiguráció kompatibilitása:** ha a régi `TARGET_REPO_URL` secret már tartalmaz HTTPS felhasználónevet és tokent, a script ezeket memóriában leválasztja az URL-ről, és csak az eredeti default repositoryhoz használja. Így az üres célmezővel működő konfiguráció tovább használható. Új beállításnál külön `TARGET_REPO_USERNAME` és `TARGET_REPO_TOKEN` szükséges; a régi URL-secretről is erre érdemes átállni. A régi URL-be ágyazott hitelesítést eltérő repositoryhoz soha nem használja. Egy meglévő SSH default (`git@host:group/repo.git` vagy `ssh://git@host/group/repo.git`) előre konfigurált deploy key/SSH agent és ellenőrzött `known_hosts` mellett továbbra is használható; SSH-hoz ne állíts be HTTPS tokent. Manuális új célhoz HTTPS URL-t kell megadni.
+Változó: SANDBOX_TARGET_REPO_URL = https://gitlab.example.com/team/sandbox-frontend.git
+Secret:  SANDBOX_TARGET_REPO_CREDENTIALS = a sandbox repository tokenje
+```
 
-A hitelesítési beállításokat csak megbízható maintainerek kezeljék. A publish secretekhez csak ellenőrzött brancheken futó kód kapjon hozzáférést. A GitLab manuális változói felülírhatják a projektváltozókat, ezért az azokat megadó felhasználókra ugyanaz a bizalmi követelmény vonatkozik, mint a publish konfigurációját kezelőkre. Ne adj általános, minden repositoryhoz hozzáférő személyes tokent a pipeline-nak.
+Indításkor csak a `DEMO` vagy `SANDBOX` profilnevet add meg. A profilnév nagybetűvel kezdődik, és kizárólag `A–Z`, `0–9`, `_` karaktereket tartalmazhat. A rendszer a név alapján választja ki a hozzá tartozó URL-t és tokent. Új profilhoz elég létrehozni a megfelelő CI-változókat és secreteket; nincs központi profillista, kódmódosítás vagy URL-allowlist. A profil URL-je a token újramentése nélkül módosítható.
 
-### Megmaradó publish-beállítások
+### Alkalmi URL és token a webes felületen
+
+Egyszeri célhoz hagyd üresen a profilnevet, és együtt add meg a `CUSTOM_TARGET_REPO_URL` és `CUSTOM_TARGET_REPO_CREDENTIALS` értékeket. GitHubon ezek a `custom_target_repo_url` és `custom_target_repo_credentials` workflow-mezők. Az alkalmi pár csak az adott futtatást befolyásolja; a default és mentett profilok beállításait nem módosítja.
+
+**Az alkalmi token normál webes input, nem CI-secret.** GitHubon a workflow-indítás adatai között, GitLabon a manuális jobváltozók között eltárolódhat, és más jogosult felhasználóknak is látható lehet. GitLabon a manuális változófelülírások nem maszkoltak, és változóhelyettesítés is történhet; `$` karaktert tartalmazó tokenhez a helyettesítést kikapcsoló mentett secret használata javasolt. Az alkalmi webes mód ezt a platformviselkedést vállalva használható. [GitHub inputtípusok](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onworkflow_dispatchinputsinput_idtype), [GitLab kézi jobváltozók](https://docs.gitlab.com/ci/jobs/job_control/#specify-variables-when-running-manual-jobs)
+
+A GitHub publish job első lépése maszkolásra regisztrálja az alkalmi tokent, mielőtt bármely későbbi lépés környezeti változóként megkapja. A publish script saját kimenete egyik platformon sem írja ki a tokent. A logmaszkolás a már eltárolt workflow-inputot vagy jobváltozót nem teszi titkossá. GitLabon a debug trace a környezeti változókat is kiírhatja; valódi tokennel ne kapcsold be.
+
+### Kiválasztási szabályok és hibák
+
+- Üres profil és üres alkalmi célmezők: a teljes default pár használatos.
+- Megadott profil: kizárólag annak saját URL-je, tokenje és opcionális felhasználóneve használatos.
+- Megadott alkalmi URL és token: kizárólag az alkalmi pár használatos.
+- Profil és bármely alkalmi célmező együttes megadása: hiba.
+- Alkalmi URL token nélkül, token URL nélkül vagy önmagában megadott alkalmi username: hiba.
+- Ismeretlen, hibás nevű vagy hiányosan konfigurált profil: hiba, default fallback nélkül.
+- Hibás URL, hiányzó token vagy elégtelen Git-jogosultság: a publish hibával leáll.
+
+Nincs tokenkölcsönzés a defaultból egy kézzel megadott másik URL-hez, és sikertelen Git-művelet után nincs másik hitelesítéssel történő újrapróbálkozás. Tetszőleges érvényes HTTPS clone URL használható, előzetes URL-regisztráció nélkül. Az URL nem tartalmazhat tokent, jelszót, felhasználónevet, queryt vagy fragmentet. A script a szolgáltató clone útvonalát használja, nem fűz hozzá automatikusan `.git` végződést.
+
+### Hitelesítés, naplózás és megmaradó beállítások
+
+A kiválasztott tokennek a konkrét célrepositoryhoz olvasási és írási jog kell. A Git-szerver ellenőrzi a tényleges jogosultságot; a token létezése önmagában nem jogosít pushra. A célbranch védelmi szabályait is be kell tartani.
+
+A naplóban látható a választott mód, a profil neve, a cél-URL, a credential-beállítás **neve**, a branch és a CSS-könyvtár. A token értékét a script nem naplózza. A token a Git credential protokollján, csak a kiválasztott HTTPS hosthoz és repositoryútvonalhoz kerül átadásra; nem kerül clone URL-be, Git-konfigurációba vagy parancssori argumentumba. A HTTP-átirányítások, örökölt credential helperek, HTTP fejlécek, URL-átírások és Git trace kimenet tiltottak. A TLS-ellenőrzés aktív; belső CA esetén `GIT_SSL_CAINFO` használható. A célrepository nyers hibakimenete helyett a script ellenőrzési útmutatót adó hibaüzenetet ír.
 
 | Változó | Alapérték / jelentés |
 |---------|---------------------|
-| `TARGET_REPO_URL` | Meglévő default célrepository |
-| `PUBLISH_TARGET_REPO_URL` | Opcionális manuális cél; üresen a default |
-| `TARGET_REPO_USERNAME`, `TARGET_REPO_TOKEN` | Default HTTPS-szerverhez tartozó hitelesítés; együtt szükségesek |
-| `TARGET_REPO_CREDENTIALS` | Opcionális JSON-secret: `origin`, `username`, `token`; például másik HTTPS-szerverhez |
-| `TARGET_REPO_BRANCH` | `IDS_CSS`; a script szükség esetén létrehozza a branchet |
+| `TARGET_REPO_BRANCH` | `IDS_CSS`; szükség esetén létrejön a branch |
 | `TARGET_CSS_PATH` | `projects/demo/src/assets/ids_css` |
 | `TARGET_CHECKOUT_DIR` | `target-repo`; biztonságos relatív helyi könyvtár |
 | `TARGET_COMMIT_MESSAGE` | `chore(tokens): update generated CSS` |
 | `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL` | GitLab/helyi fallback: `token-pipeline`, `token-pipeline@example.invalid`; GitHubon a workflow botazonosítót ad |
 
-A script csak a cél CSS-könyvtár tartalmát cseréli le. A célrepository többi fájlja megmarad; azonos CSS esetén nincs új commit vagy push. A célbranch védelmi szabályait továbbra is be kell tartani.
+Ezek a beállítások mindhárom célválasztási módban azonosak. A script csak a cél CSS-könyvtár tartalmát cseréli le. Más célfájlok megmaradnak; azonos CSS esetén nincs új commit vagy push. A checkout- és célútvonalak nem vezethetnek ki a repositoryból és nem haladhatnak át szimbolikus linken.
+
+### Átállás a korábbi publish-konfigurációról
+
+Ez a célválasztás **nem visszafelé kompatibilis**. A korábbi beállítások nem szolgálnak fallbackként.
+
+| Korábbi beállítás | Új beállítás |
+|------------------|-------------|
+| `TARGET_REPO_URL` | `DEFAULT_TARGET_REPO_URL`, csak a hitelesítés nélküli URL |
+| `TARGET_REPO_TOKEN`, illetve az URL-be ágyazott token | `DEFAULT_TARGET_REPO_CREDENTIALS`, csak a nyers token |
+| `TARGET_REPO_USERNAME`, illetve az URL-be ágyazott username | Opcionális `DEFAULT_TARGET_REPO_USERNAME` |
+| `TARGET_REPO_CREDENTIALS` JSON | A token a default vagy a választott profil `…_CREDENTIALS` secretjébe; az URL külön látható változóba kerül |
+| `PUBLISH_TARGET_REPO_URL`, GitHubon `target_repo_url` | Profil választása, vagy az új alkalmi URL **és** token együtt |
+
+Az új beállítások létrehozása után a régi cél- és hitelesítési változók törölhetők. A mentett default- és profiltokeneket a CI secretkezelőjében add meg. Az új publish-párok HTTPS URL-t és tokent használnak; a korábbi SSH-default konfigurációt is erre kell átállítani. Az `IDS_STYLES_REF`, a parser és a forrásrepository CSS-visszacommitolásának beállításai változatlanok.
 
 ## GitHub Actions használata
 
@@ -108,27 +147,39 @@ A generált CSS forrásbranchre történő visszacommitolásának meglévő logi
 4. Indítsd el a futtatást. Ha a `validate-ids-styles` Environmenthez jóváhagyás tartozik, a **Review deployments** felületen hagyd jóvá.
 5. A **Validate tokens against ids-styles** job logjában találod az eltéréseket. Az **Artifacts → token-diff-report** csomagban van a `token-diff-report.json`, sikeres és sikertelen összehasonlítás után is, hét napig. CSS-generálási vagy artifact-letöltési hiba esetén a validátor nem jut el az összehasonlításig.
 
-### Manuális CSS-publish
+### Manuális CSS-publish: a három mód
 
-1. **Run workflow**, válaszd a forrásbranchét/tagjét, majd az `operation: publish` értéket.
-2. A `target_repo_url` mező opcionális. Üresen a konfigurált `TARGET_REPO_URL` célt használja. Eltérő célhoz adj meg tetszőleges érvényes HTTPS Git clone URL-t, hitelesítési adatok nélkül. Másik szerverhez annak saját, szerverhez kötött hitelesítése szükséges a fenti leírás szerint.
-3. Indítsd el a futtatást. A CSS-generálás után, ha van Environment-jóváhagyási szabály, a **Review deployments** felületen hagyd jóvá a `publish-tokens` telepítést.
-4. A **Publish CSS** job a futtatás saját CSS-artifactját publikálja a `TARGET_REPO_BRANCH` branch `TARGET_CSS_PATH` könyvtárába. `ids_styles_ref` megadása ehhez nem szükséges.
-5. A job logjában látszik a siker, a változatlan CSS vagy az egyértelmű hiba. Sikertelen publish hibás jobot és hibás workflow-futtatást eredményez.
+1. Nyisd meg az **Actions → Token Pipeline → Run workflow** felületet, válaszd a token-store forrásbranchét/tagjét és az `operation: publish` értéket.
+2. Válassz az alábbi kitöltések közül:
+
+   | Mód | `target_profile` | `custom_target_repo_url` | `custom_target_repo_credentials` |
+   |-----|------------------|--------------------------|----------------------------------|
+   | Default | üres | üres | üres |
+   | Mentett profil | például `DEMO` | üres | üres |
+   | Alkalmi | üres | a cél HTTPS clone URL-je | a cél saját tokenje |
+
+   A `custom_target_repo_username` csak alkalmi célhoz használható, és opcionális; alapértéke `git`. Default/profil választásakor ezt is hagyd üresen.
+3. Kattints a **Run workflow** gombra. Az alkalmi token normál inputként rögzülhet; a fent leírt láthatósági korlát erre a mezőre is vonatkozik.
+4. A CSS-generálás után, ha van Environment-jóváhagyás, a **Review deployments** felületen hagyd jóvá a `publish-tokens` telepítést.
+5. A **Publish CSS** job első lépése regisztrálja a token logmaszkolását, majd a futtatás saját CSS-artifactját publikálja. A job naplója mutatja a módot, profilnevet, URL-t, credential-beállítás nevét, branchet és célkönyvtárat.
+6. A job logjában találod a sikert, a változatlan CSS jelzését vagy a hibát. Sikertelen publish hibás jobot és hibás workflow-futtatást eredményez. Az `ids_styles_ref` ehhez nem szükséges.
 
 ### Szükséges GitHub-beállítások
 
-A **Settings → Secrets and variables → Actions** felületen:
+A **Settings → Secrets and variables → Actions** felületen, vagy a `publish-tokens` Environmentben:
 
-- **Secrets:** `TARGET_REPO_USERNAME`, `TARGET_REPO_TOKEN`, illetve másik szerverhez szükség esetén `TARGET_REPO_CREDENTIALS` (a fenti JSON-formátumban). Célszerű a `publish-tokens` Environmenthez kötni őket, és csak ellenőrzött brancheket engedni erre az Environmentre.
-- **Default cél:** a meglévő `TARGET_REPO_URL` secret működik tovább. Hitelesítési adatot nem tartalmazó URL azonos nevű Variable-ként is megadható; ha mindkettő létezik, a Secret az elsődleges.
-- **Variables:** `IDS_STYLES_REF`, valamint a fenti táblázat opcionális branch-, könyvtár- és szerzőbeállításai.
-- **Environments:** `publish-tokens` és `validate-ids-styles`. A Required reviewers további jóváhagyást adhatnak; a manuális publish működése nem függ ettől.
-- A saját forrásrepositoryba történő CSS-visszacommitoláshoz a `parse_tokens` job `GITHUB_TOKEN`-je `contents: write` jogot kér. Ez a token nem szolgál automatikusan egy másik repository hitelesítésére.
+- **Variables:** `DEFAULT_TARGET_REPO_URL`, illetve minden mentett profil saját `<PROFIL>_TARGET_REPO_URL` értéke. Az opcionális username ugyanilyen előtagú `…_TARGET_REPO_USERNAME` változó. Az URL-eket ne Secretként tárold, mert a workflow a `vars` kontextusból olvassa őket.
+- **Secrets:** `DEFAULT_TARGET_REPO_CREDENTIALS`, illetve például `DEMO_TARGET_REPO_CREDENTIALS`, `SANDBOX_TARGET_REPO_CREDENTIALS`. Mindegyik érték a megfelelő repository nyers tokenje. A defaultot és minden profilt csak egyszer kell felvenni; publishkor nem kell átírni a meglévő secreteket.
+- **Alkalmi értékek:** a `custom_target_repo_*` mezőket a **Run workflow** űrlapon add meg, ne állandó repository-változóként.
+- **További Variables:** `IDS_STYLES_REF`, valamint a közös `TARGET_REPO_BRANCH`, `TARGET_CSS_PATH`, checkout-, commit- és szerzőbeállítások.
+- **Environments:** `publish-tokens` és `validate-ids-styles`. A Required reviewers további jóváhagyást adhatnak; a manuális publish működése nem függ ettől. A publishhoz használt mentett secreteket célszerű a `publish-tokens` Environmenthez és ellenőrzött branchekhez kötni.
+- A forrásrepositoryba történő CSS-visszacommitoláshoz a `parse_tokens` job `GITHUB_TOKEN`-je `contents: write` jogot kér; a célrepository tokenje ettől külön működik.
 
-GitHub célhoz használj a kiválasztott repositorykra korlátozott fine-grained PAT-ot **Contents: Read and write** jogosultsággal, vagy megfelelően jogosított GitHub App tokent. A szervezeti jóváhagyási és SSO-szabályoknak is teljesülniük kell. Más szolgáltató célrepositoryjához annak saját, korlátozott tokenje szükséges.
+GitHub célhoz a kiválasztott repositoryhoz jogosított fine-grained PAT **Contents: Read and write** joggal, vagy megfelelő GitHub App token használható. A szervezeti jóváhagyási és SSO-szabályoknak is teljesülniük kell. GitLab célhoz GitLab által kiadott, megfelelően korlátozott token kell.
 
-A **Run workflow** felület csak a default branchre felkerült workflow-hoz érhető el. A módosítások helyi elkészítése önmagában nem frissíti ezt a felületet.
+A profilnév alapján a workflow csak a kiválasztott URL-változót és credential-secretet adja át a közös publish scriptnek. A mentett profil URL-jének javításához a megfelelő Variable-t módosítsd, a tokent tartalmazó Secretet nem kell újramenteni.
+
+A **Run workflow** felület a default branchre felkerült workflow-hoz érhető el; a helyi fájlmódosítás önmagában nem frissíti ezt a felületet.
 
 ## GitLab CI/CD használata
 
@@ -153,39 +204,44 @@ A **Run workflow** felület csak a default branchre felkerült workflow-hoz érh
 4. A validáció nem indít publish-t. Hiányzó token vagy futtatási hiba esetén a job hibás (`allow_failure: false`). A pipeline emiatt blokkoltnak/hibásnak látszhat; a publish csak a `parse_tokens` jobtól függ, nem a validációtól.
 5. Az eltérések a job logjában, a `token-diff-report.json` a job artifactjai között találhatók. A riportot a runner hibás validáció után is feltölti, ha a validátor létre tudta hozni; megőrzés hét nap.
 
-### Manuális CSS-publish és célmegadás
+### Manuális CSS-publish: a három mód
 
-1. Nyisd meg azt a pipeline-t, amelynek a CSS-ét publikálni szeretnéd; a `parse_tokens` jobnak sikeresen le kell futnia.
-2. Kattints a **`publish_tokens` job nevére**. Másik cél megadásához a job adatlapját nyisd meg, ne a közvetlen lejátszás ikont.
-3. A változóűrlapon opcionálisan adj meg tetszőleges érvényes HTTPS Git clone URL-t (előzetes regisztráció nélkül):
+1. Nyisd meg azt a pipeline-t, amelynek a CSS-ét publikálni szeretnéd. A `parse_tokens` jobnak sikeresen le kell futnia.
+2. Kattints a **`publish_tokens` job nevére**. Paraméterek megadásához a job adatlapját nyisd meg, ne a közvetlen lejátszás ikont.
+3. A változóűrlapot az alábbiak szerint töltsd ki:
 
-   ```text
-   Key: PUBLISH_TARGET_REPO_URL
-   Value: https://github.com/example/frontend.git
-   ```
+   | Mód | Jobváltozók |
+   |-----|-------------|
+   | Default | Ne adj meg profil- vagy alkalmi célváltozót |
+   | Mentett profil | `PUBLISH_TARGET_PROFILE = DEMO` |
+   | Alkalmi | `CUSTOM_TARGET_REPO_URL = https://github.com/example/frontend.git` és `CUSTOM_TARGET_REPO_CREDENTIALS = a cél saját tokenje` |
 
-4. Üres vagy kihagyott felülírásnál a konfigurált `TARGET_REPO_URL` használatos. A felülírás a **New pipeline** oldalon is megadható; a joboldali érték azt az adott publish-futtatásra felülírhatja.
-5. Kattints a **Run job** gombra. Nincs szükség validáció indítására vagy sikeres validációs eredményre.
-6. A job saját pipeline-jának CSS-artifactját publikálja az eddigi branch- és CSS-útvonalbeállításokkal. Lejárt artifact esetén előbb új CSS-generálást indíts.
-7. A `publish_tokens` logjában találod az eredményt. A manuális job meglévő `allow_failure: true` beállítása megmarad: hibánál a job hibát jelez, de a teljes pipeline figyelmeztetéssel is befejeződhet. Mindig a publish job eredményét ellenőrizd.
+   Alkalmi célhoz szükség esetén `CUSTOM_TARGET_REPO_USERNAME` is megadható; alapértéke `git`. Profil és alkalmi mezők egyszerre nem használhatók.
+4. Kattints a **Run job** gombra. A manuális űrlapon megadott token más jogosult felhasználóknak is látható lehet, és nem maszkolt CI-secret; a korábban leírt platformkorlátok érvényesek.
+5. A job a saját pipeline-jának CSS-artifactját publikálja a közös branch- és könyvtárbeállításokkal. Lejárt artifact esetén indíts új CSS-generálást. Validáció indítása vagy sikere nem előfeltétel.
+6. A naplóban a választott mód, profilnév, URL, credential-beállítás neve, branch és célkönyvtár látható. A script a token értékét nem írja ki. Az eredményt és a hibát is itt találod.
 
-A manuális változók más, jogosult projektfelhasználóknak is láthatók lehetnek. Ide csak nem titkos URL vagy ref kerülhet; tokent soha ne ezen az űrlapon adj meg. A jobváltozók kezelése a [GitLab manuális jobok dokumentációját](https://docs.gitlab.com/ci/jobs/job_control/) követi, új GitLab-verzióhoz kötött job input szintaxis nélkül.
+A paraméterek a **New pipeline** oldalon is megadhatók; a joboldali érték az adott publish-futtatásra felülírhatja őket. Új default publishhoz hagyd üresen a profil- és alkalmi mezőket; retrykor ellenőrizd az esetleg előre kitöltött korábbi jobváltozókat.
+
+A meglévő `allow_failure: true` megmarad: sikertelen publish esetén a job hibát jelez, de a teljes pipeline figyelmeztetéssel is befejeződhet. Mindig a publish job eredményét ellenőrizd. A manuális változóűrlap működését a [GitLab dokumentációja](https://docs.gitlab.com/ci/jobs/job_control/) részletezi.
 
 ### Szükséges GitLab-beállítások
 
 A **Settings → CI/CD → Variables** alatt:
 
-- `TARGET_REPO_URL`: a meglévő default cél; új beállításnál hitelesítési adatok nélküli HTTPS URL.
-- `TARGET_REPO_USERNAME`, `TARGET_REPO_TOKEN`: külön hitelesítés; a tokent **Masked**, lehetőség szerint **Hidden** és **Protected** változóként tárold. Environment scope-ja lehet `publish-tokens`, mert a publish job ehhez az Environmenthez tartozik. Protected secret csak megfelelő védett refen érhető el.
-- `TARGET_REPO_CREDENTIALS`: opcionális, egy sorban tárolt JSON-secret másik HTTPS-szerver hitelesítéséhez, a fenti formátumban. Használj **Masked**, lehetőség szerint **Hidden**, **Protected** és `publish-tokens` scope beállítást; az értékben kapcsold ki a változóhelyettesítést. A default- és hitelesítési változókat ne írd felül a manuális job űrlapján.
-- `IDS_STYLES_REF`: a validáció alapértelmezett ids-styles branch/tag/SHA értéke; publish-hoz nem szükséges.
-- A fenti táblázat opcionális `TARGET_REPO_BRANCH`, `TARGET_CSS_PATH`, checkout-, commit- és szerzőváltozói továbbra is használhatók.
+- **Default:** `DEFAULT_TARGET_REPO_URL` látható változó és `DEFAULT_TARGET_REPO_CREDENTIALS` **Masked**, lehetőség szerint **Hidden** tokenváltozó.
+- **Profilok:** például `DEMO_TARGET_REPO_URL` látható változó és `DEMO_TARGET_REPO_CREDENTIALS` **Masked**, lehetőség szerint **Hidden** tokenváltozó. További profilhoz ugyanilyen névpárt hozz létre; nincs szükség `.gitlab-ci.yml` módosítására.
+- **Username:** szükség esetén `DEFAULT_TARGET_REPO_USERNAME` vagy `<PROFIL>_TARGET_REPO_USERNAME`, látható változóként.
+- A tokenváltozók típusa **Variable** legyen, ne **File**. Kapcsold ki az **Expand variable reference** opciót, hogy a token pontos értéke érkezzen meg. Environment scope lehet `publish-tokens`. **Protected** változó csak megfelelő védett refen érhető el.
+- **Alkalmi adatok:** a `CUSTOM_TARGET_REPO_*` értékeket a futtatás űrlapján add meg; ne hozz létre állandó custom változókat, mert azok a későbbi publishokat is alkalmi módra állítanák.
+- `IDS_STYLES_REF`: a validáció alapértelmezett ids-styles branch/tag/SHA értéke. Publishhoz nem szükséges.
+- A közös `TARGET_REPO_BRANCH`, `TARGET_CSS_PATH`, checkout-, commit- és szerzőváltozók továbbra is használhatók.
 
-GitLab célhoz a kiválasztott projekt(ek)re korlátozott project/group access token vagy megfelelően korlátozott PAT használható **write_repository** jogosultsággal. A hagyományos GitLab deploy token `read_repository` joga nem elegendő Git-pushhoz. A token mögötti felhasználó/bot szerepköre és a védett célbranch szabályai is engedjék az írást. A forrásprojekt `CI_JOB_TOKEN`-jét a publish nem küldi automatikusan másik repositorynak.
+GitLab célhoz a kiválasztott projekt(ek)re korlátozott project/group access token vagy megfelelő PAT használható **write_repository** jogosultsággal. A hagyományos GitLab deploy token `read_repository` joga nem elegendő Git-pushhoz; a konkrét deploy/bot username szükség esetén külön beállítandó. A védett célbranch szabályai is engedjék az írást. GitHub célhoz annak saját tokenje kell. A forrásprojekt `CI_JOB_TOKEN`-je nem szolgál célhitelesítési fallbackként.
 
-A publish futtatóit a `publish-tokens` protected Environmenttel korlátozd, ha a GitLab kiadás támogatja. Protected Environment hiányában csak védett forrásrefen adj ki Protected publish secreteket, és a branch merge-jogát korlátozd a megbízható publish-kezelőkre. A manuális jobváltozók külön felülírási lehetőséget jelentenek; a pipeline-változók minimum szerepköre önmagában nem védi ezeket. A pipeline-változók felülírásához szükséges minimum szerepkört állítsd megbízható maintainer/owner szintre; a felülírások jogát ne add a publish-hitelesítést nem kezelő felhasználóknak. Részletek: [GitLab CI/CD változók](https://docs.gitlab.com/ci/variables/).
+A mentett pár URL-jét a megfelelő látható `…_TARGET_REPO_URL` változóban javítsd; a tokenhez nem kell hozzányúlni. A default- és profilbeállításokat megbízható maintainerek kezeljék. A manuális jobváltozók felülírhatják a projektváltozókat, ezért a publish futtatásának joga és a védett secretekhez való hozzáférés csak megbízható szerepköröknél legyen. Használj protected Environmentet, ha a GitLab kiadás támogatja; egyébként Protected secreteket és megfelelően korlátozott védett forrásbrancheket. A pipeline-változók minimum szerepköre önmagában nem védi a manuális jobfelülírásokat. [GitLab CI/CD változók](https://docs.gitlab.com/ci/variables/)
 
-A saját forrásrepositoryba történő CSS-visszacommitoláshoz külön engedélyezni kell a projekt saját `CI_JOB_TOKEN` push-jogát, vagy a meglévő masked `SELF_REPO_URL` konfiguráció használható. A publish célhitelesítése ettől külön működik.
+A saját forrásrepositoryba történő CSS-visszacommitoláshoz továbbra is külön engedélyezni kell a projekt saját `CI_JOB_TOKEN` push-jogát, vagy használható a meglévő masked `SELF_REPO_URL`. Ez a célrepositoryba történő publikálástól külön működik.
 
 ## A tokenvalidáció riportjának értelmezése
 
@@ -203,6 +259,6 @@ npm ci
 npm test
 ```
 
-A tesztcsomag TypeScript-ellenőrzést, valódi ideiglenes Git-repositorykon clone/commit/push műveleteket, Git credential-protokolltesztet, a workflow-feltételek helyi kiértékelését és a validátor CLI-jának sikeres/hibás végigfuttatását tartalmazza. A validációs teszt egy lokális ids-styles fixture tagjét checkoutolja és buildeli; nem igényli az éles ids-styles repositoryt. A publish-tesztek kizárólag ideiglenes lokális célokra írnak. `file://` vagy abszolút helyi cél csak CI-n kívül, hitelesítési adatok nélkül használható; CI-ben ezek tiltottak.
+A tesztcsomag TypeScript-ellenőrzést, a default/profil/alkalmi módok kiválasztását és hibáit, valódi ideiglenes Git-repositorykon clone/commit/push műveleteket mindhárom módban, Git credential-protokolltesztet, a workflow-feltételek helyi kiértékelését és a validátor CLI-jának sikeres/hibás végigfuttatását tartalmazza. A validációs teszt egy lokális ids-styles fixture tagjét checkoutolja és buildeli; nem igényli az éles ids-styles repositoryt. A publish-tesztek kizárólag ideiglenes lokális célokra írnak. `file://` vagy abszolút helyi cél csak CI-n kívül, hitelesítési adatok nélkül használható; CI-ben ezek tiltottak.
 
-A helyi workflow-tesztek nem helyettesítik a GitHub Actions runner és a GitLab scheduler tényleges futtatását. A távoli Environment-szabályok, projektjogosultságok, tokenek, SSH deploy key-k és a konkrét GitLab-verzió adminbeállításai csak a megfelelő platformon ellenőrizhetők. Éles publish nem része a tesztelésnek. Bevezetéskor külön tesztcélrepositoryval ellenőrizd a szervezeti jogosultságokat és a felületi jóváhagyást.
+A helyi workflow-tesztek nem helyettesítik a GitHub Actions runner és a GitLab scheduler tényleges futtatását. A távoli Environment-szabályok, projektjogosultságok, tokenek és a konkrét GitLab-verzió adminbeállításai csak a megfelelő platformon ellenőrizhetők. Éles publish nem része a tesztelésnek. Bevezetéskor külön tesztcélrepositoryval ellenőrizd a szervezeti jogosultságokat és a felületi jóváhagyást.
