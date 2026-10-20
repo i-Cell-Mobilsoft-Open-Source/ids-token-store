@@ -24,16 +24,7 @@ variables:
     description: "Token validation only: ids-styles branch, tag or commit SHA. Does not affect publishing."
   PUBLISH_TARGET_PROFILE:
     value: ""
-    description: "Publish only: saved profile name, e.g. DEMO. Empty target fields use the DEFAULT_TARGET_REPO_* pair."
-  CUSTOM_TARGET_REPO_URL:
-    value: ""
-    description: "Publish only: one-off HTTPS clone URL, paired with CUSTOM_TARGET_REPO_CREDENTIALS. Leave the profile empty."
-  CUSTOM_TARGET_REPO_CREDENTIALS:
-    value: ""
-    description: "Publish only: one-off token for the custom URL. Ordinary manual variable: visible to other authorized users."
-  CUSTOM_TARGET_REPO_USERNAME:
-    value: ""
-    description: "Publish only: optional HTTPS username for the custom token (default: git)."
+    description: "Publish only: saved profile name, e.g. DEMO. Empty uses the DEFAULT_TARGET_REPO_* pair."
 
 default:
   image: node:22-bookworm

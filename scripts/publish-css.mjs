@@ -34,11 +34,6 @@ function repository(raw, { local = false } = {}) {
 
 export function resolveTarget(env) {
   const profile = (env.PUBLISH_TARGET_PROFILE || '').trim();
-  const customUrl = (env.CUSTOM_TARGET_REPO_URL || '').trim();
-  const customToken = env.CUSTOM_TARGET_REPO_CREDENTIALS || '';
-  const customUsername = (env.CUSTOM_TARGET_REPO_USERNAME || '').trim();
-  const custom = Boolean(customUrl || customToken || customUsername);
-  if (profile && custom) fail('Choose a saved profile OR a custom URL/token pair, not both.');
 
   let mode = 'default';
   let settings;
@@ -53,11 +48,6 @@ export function resolveTarget(env) {
     // use read the same named profile directly from the environment.
     const prefix = Object.hasOwn(env, 'PUBLISH_PROFILE_URL') ? 'PUBLISH_PROFILE' : `${profile}_TARGET_REPO`;
     settings = { url: env[`${prefix}_URL`], token: env[`${prefix}_CREDENTIALS`], username: env[`${prefix}_USERNAME`] };
-  } else if (custom) {
-    mode = 'custom';
-    credentialName = 'CUSTOM_TARGET_REPO_CREDENTIALS';
-    if (!customUrl) fail('Custom publishing requires both CUSTOM_TARGET_REPO_URL and CUSTOM_TARGET_REPO_CREDENTIALS.');
-    settings = { url: customUrl, token: customToken, username: customUsername };
   } else {
     settings = { url: env.DEFAULT_TARGET_REPO_URL, token: env.DEFAULT_TARGET_REPO_CREDENTIALS, username: env.DEFAULT_TARGET_REPO_USERNAME };
   }
@@ -73,7 +63,6 @@ export function resolveTarget(env) {
   if (url.startsWith('file:')) {
     if (token) fail('Local test repositories must not receive publish credentials.');
   } else if (!token) {
-    if (mode === 'custom') fail('Custom publishing requires both CUSTOM_TARGET_REPO_URL and CUSTOM_TARGET_REPO_CREDENTIALS.');
     fail(`Missing publish token. Configure ${credentialName} for the selected destination; no other credential is used as fallback.`);
   }
   return { mode, profile, credentialName, url, username, token };
