@@ -31,6 +31,14 @@ npm run publish
 
 A parser bemeneti gyökerét a `FIGMA_INPUT_DIR`, kimenetét a `CSS_OUTPUT_DIR` írhatja felül (alapérték: `ids_css`). Üres tokenbemenetnél a parser továbbra is sikeresen leáll. Helyileg az `npm run publish` előbb parse-ol; a CI a saját futtatásának CSS-artifactját használja `SKIP_PARSE=true` mellett. Ha ez az artifact hiányzik, a publish hibával leáll.
 
+### Komponensenkénti CSS-fájlok
+
+Az `npm run parse` a közös `ids_css/component/component.css` mellett komponensenként külön `ids_css/component/ids-<komponensnév>.css` fájlt is készít. A teljes, normalizált forrásmappanév kerül a fájlnévbe: például `ids-button.css`, `ids-icon.css`, `ids-icon-button.css`, `ids-segmented-control.css` és `ids-segmented-control-toggle.css`.
+
+A külön fájlok a közös `component.css` ugyanazon deduplikált tokenjeit, azonos nevekkel és értékekkel, `:root` blokkban tartalmazzák, beleértve a méretváltozatokat. A `var(...)` hivatkozások megmaradnak; külön komponensfájl betöltésekor a szükséges foundation CSS-eket is be kell tölteni.
+
+A `tokens.css` továbbra is a közös `component/component.css` fájlt importálja. A korábbi betöltési mód és importálási sorrend megmarad; a külön komponensfájlokat igény szerint lehet használni. A CSS-artifact, a source commit és a default/profil publish a külön fájlokat is automatikusan tartalmazza. A parser minden futáskor újragenerálja a kimeneti könyvtárat, ezért a megszűnt komponensek fájljai nem maradnak benne. Token nélküli komponenshez nem készül külön fájl.
+
 ## Publikálási cél: default és mentett profil
 
 A publish kétféle, előre konfigurált URL–token párt tud kiválasztani. A cél URL-je külön, látható változóban tárolható és javítható; a token CI-secretben tárolandó. A publish célválasztó paramétere csak a profilnév; az URL és a token a mentett konfigurációból érkezik. A `CREDENTIALS` értéke minden esetben **a nyers token**, nem JSON és nem hitelesítést tartalmazó URL.
@@ -240,6 +248,8 @@ Mindkét lista egyedi neveket tartalmaz, alfabetikus sorrendben. Branch megadás
 npm ci
 npm test
 ```
+
+Az `npm run test:parse` külön is futtatható: rögzített fixture-ön ellenőrzi a hat korábbi CSS-fájl változatlan tartalmát, a teljes komponensnevek elkülönítését, a duplikációk kezelését és az elavult fájlok takarítását. A repository aktuális tokenjeivel is végigfuttatja a parsert, majd ellenőrzi, hogy a külön fájlok együttesen pontosan a közös `component.css` kulcs–érték párjait tartalmazzák, és a validátor eredménye nem változik.
 
 A tesztcsomag TypeScript-ellenőrzést, a default/profil módok kiválasztását és hibáit, valódi ideiglenes Git-repositorykon clone/commit/push műveleteket mindkét módban, Git credential-protokolltesztet, a workflow-feltételek helyi kiértékelését és a validátor CLI-jának sikeres/hibás végigfuttatását tartalmazza. A validációs teszt egy lokális ids-styles fixture tagjét checkoutolja és buildeli; nem igényli az éles ids-styles repositoryt. A publish-tesztek kizárólag ideiglenes lokális célokra írnak. `file://` vagy abszolút helyi cél csak CI-n kívül, hitelesítési adatok nélkül használható; CI-ben ezek tiltottak.
 

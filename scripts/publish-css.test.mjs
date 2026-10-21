@@ -119,6 +119,10 @@ function fixture(t) {
   const seed = path.join(root, 'seed');
   mkdirSync(source); mkdirSync(seed); mkdirSync(path.join(source, 'ids_css'));
   writeFileSync(path.join(source, 'ids_css', 'tokens.css'), ':root { --ids-comp-test: 1px; }\n');
+  mkdirSync(path.join(source, 'ids_css', 'component'));
+  for (const file of ['component.css', 'ids-test.css']) {
+    writeFileSync(path.join(source, 'ids_css', 'component', file), ':root { --ids-comp-test: 1px; }\n');
+  }
   git(root, 'init', '--bare', '--initial-branch=main', bare);
   git(root, 'init', '--bare', '--initial-branch=main', other);
   git(seed, 'init', '--initial-branch=main');
@@ -148,6 +152,8 @@ test('real clone/commit/push uses the fallback, preserves other files, and is id
   assert.ok(result.stdout.includes(f.bare));
   assert.match(result.stdout, /Credential setting: DEFAULT_TARGET_REPO_CREDENTIALS/);
   assert.match(git(f.root, '--git-dir', f.bare, 'show', `IDS_CSS:${defaultCss}`), /--ids-comp-test/);
+  assert.equal(git(f.root, '--git-dir', f.bare, 'show', 'IDS_CSS:projects/demo/src/assets/ids_css/component/ids-test.css'),
+    git(f.root, '--git-dir', f.bare, 'show', 'IDS_CSS:projects/demo/src/assets/ids_css/component/component.css'));
   assert.equal(git(f.root, '--git-dir', f.bare, 'show', 'IDS_CSS:README.md'), 'Keep this file');
   const first = git(f.root, '--git-dir', f.bare, 'rev-parse', 'IDS_CSS');
   result = f.run();
@@ -166,6 +172,8 @@ test('profile target receives CSS with branch/path options and does not change t
   assert.ok(result.stdout.includes(f.other));
   assert.match(result.stdout, /Credential setting: DEMO_TARGET_REPO_CREDENTIALS/);
   assert.match(git(f.root, '--git-dir', f.other, 'show', 'release/css:styles/generated/tokens.css'), /--ids-comp-test/);
+  assert.equal(git(f.root, '--git-dir', f.other, 'show', 'release/css:styles/generated/component/ids-test.css'),
+    git(f.root, '--git-dir', f.other, 'show', 'release/css:styles/generated/component/component.css'));
   assert.equal(git(f.root, '--git-dir', f.bare, 'branch', '--list', 'IDS_CSS'), '');
   const first = git(f.root, '--git-dir', f.other, 'rev-parse', 'release/css');
   result = f.run(settings);
