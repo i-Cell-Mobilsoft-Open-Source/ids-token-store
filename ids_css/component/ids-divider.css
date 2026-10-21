@@ -1,0 +1,23 @@
+:root {
+  --ids-comp-divider-color-bg-brand-default: var(--ids-smc-reference-container-color-bg-brand-default);
+  --ids-comp-divider-color-bg-dark-default: var(--ids-smc-reference-container-color-bg-surface-darker-95);
+  --ids-comp-divider-color-bg-error-default: var(--ids-smc-reference-container-color-bg-error-default);
+  --ids-comp-divider-color-bg-light-default: var(--ids-smc-reference-container-color-bg-surface-lighter-10);
+  --ids-comp-divider-color-bg-primary-default: var(--ids-smc-reference-container-color-bg-primary-default);
+  --ids-comp-divider-color-bg-secondary-default: var(--ids-smc-reference-container-color-bg-secondary-default);
+  --ids-comp-divider-color-bg-success-default: var(--ids-smc-reference-container-color-bg-success-default);
+  --ids-comp-divider-color-bg-surface-default: var(--ids-smc-reference-container-color-bg-surface-darker-30);
+  --ids-comp-divider-color-bg-warning-default: var(--ids-smc-reference-container-color-bg-warning-default);
+  --ids-comp-divider-size-border-radius-comfortable: var(--ids-smc-reference-container-border-radius-none);
+  --ids-comp-divider-size-border-radius-compact: var(--ids-smc-reference-container-border-radius-none);
+  --ids-comp-divider-size-border-radius-dense: var(--ids-smc-reference-container-border-radius-none);
+  --ids-comp-divider-size-border-radius-spacious: var(--ids-smc-reference-container-border-radius-none);
+  --ids-comp-divider-size-height-comfortable: var(--ids-smc-reference-container-size-height-2);
+  --ids-comp-divider-size-height-compact: var(--ids-smc-reference-container-size-height-1);
+  --ids-comp-divider-size-height-dense: var(--ids-smc-reference-container-size-height-4);
+  --ids-comp-divider-size-height-spacious: var(--ids-smc-reference-container-size-height-4);
+  --ids-comp-divider-size-width-comfortable: var(--ids-smc-reference-container-size-width-2);
+  --ids-comp-divider-size-width-compact: var(--ids-smc-reference-container-size-width-1);
+  --ids-comp-divider-size-width-dense: var(--ids-smc-reference-container-size-width-4);
+  --ids-comp-divider-size-width-spacious: var(--ids-smc-reference-container-size-width-4);
+}
