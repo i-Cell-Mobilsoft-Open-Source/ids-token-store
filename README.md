@@ -1,10 +1,14 @@
-# Token Store
+# IDS Token Store
 
-Ez a repository a Figma bridge és a frontend projekt közötti átadó pipeline. 
+A repository a Figma tokenexportokból CSS-t generál, az `ids-styles` tokenhivatkozásait ellenőrzi, és külön felhasználói művelettel frontend repositoryba publikál. A GitHub Actions és a GitLab CI/CD ugyanazokat az npm parancsokat használja.
 
-## Könyvtárstruktúra
+| Művelet | Mit csinál? | Publikál célrepositoryba? |
+|---------|-------------|-------------------------|
+| CSS-generálás | Figma JSON → `ids_css/` | Nem |
+| Tokenvalidáció | Generált komponens-tokenek összehasonlítása a kiválasztott `ids-styles` verzióval | Nem |
+| CSS-publikálás | Az adott futtatás CSS-ét commitolja és pusholja a célrepositoryba | Igen, csak manuálisan |
 
-A Figma export két könyvtára közvetlenül a repository gyökerébe kerül:
+## Bemenet és helyi használat
 
 ```text
 foundations/
@@ -16,169 +20,237 @@ components/
 └── <komponens>/{comp-color,comp-size}/*.json
 ```
 
-Üres bemenettel a parser sikeresen leáll és nem készít CSS-t. A `foundations/**` vagy `components/**` alatti push automatikusan elindítja a GitLab parse jobot. A teljes pipeline a GitLab **Build > Pipelines > New pipeline** felületéről manuálisan is indítható. Beérkező tokenek esetén az `ids_css` könyvtárba generálja a fájlokat, artifactként eltárolja, majd `[skip ci]` commitban visszapusholja az aktuális branchre.
-
-## Helyi használat
-
 ```bash
 npm ci
 npm run parse
+# Kizárólag tokenvalidáció; előbb generálj CSS-t:
+IDS_STYLES_REF=main npm run validate:ids-styles
+# Publikálás a lent ismertetett cél- és hitelesítési beállításokkal:
+npm run publish
 ```
 
-Ha egy másik bemeneti gyökér alatt található a `foundation` és a `components`, az a `FIGMA_INPUT_DIR` változóval adható meg. A kimenet a `CSS_OUTPUT_DIR` változóval írható felül.
+A parser bemeneti gyökerét a `FIGMA_INPUT_DIR`, kimenetét a `CSS_OUTPUT_DIR` írhatja felül (alapérték: `ids_css`). Üres tokenbemenetnél a parser továbbra is sikeresen leáll. Helyileg az `npm run publish` előbb parse-ol; a CI a saját futtatásának CSS-artifactját használja `SKIP_PARSE=true` mellett. Ha ez az artifact hiányzik, a publish hibával leáll.
 
-## GitLab pipeline és publikálás
+### Komponensenkénti CSS-fájlok
 
-A `parse_tokens` job automatikus. Az elkészült CSS hét napig letölthető pipeline artifactként. A `publish_tokens` job mindig manuális (`when: manual`), tehát a parse befejezése önmagában soha nem pushol a célrepóba. Publikáláskor a job klónozza a célrepót, lecseréli a cél CSS-könyvtár tartalmát, és csak tényleges változás esetén commitol és pushol.
+Az `npm run parse` a közös `ids_css/component/component.css` mellett komponensenként külön `ids_css/component/ids-<komponensnév>.css` fájlt is készít. A teljes, normalizált forrásmappanév kerül a fájlnévbe: például `ids-button.css`, `ids-icon.css`, `ids-icon-button.css`, `ids-segmented-control.css` és `ids-segmented-control-toggle.css`.
 
-A saját repóba történő pushhoz a GitLab projektben engedélyezni kell, hogy a projekt saját `CI_JOB_TOKEN`-je pusholhasson. Alternatívaként a hitelesített clone URL a masked `SELF_REPO_URL` CI/CD változóban adható meg. A tokent használó identitásnak az aktuális (protected) branchre is pushjoggal kell rendelkeznie.
+A külön fájlok a közös `component.css` ugyanazon deduplikált tokenjeit, azonos nevekkel és értékekkel, `:root` blokkban tartalmazzák, beleértve a méretváltozatokat. A `var(...)` hivatkozások megmaradnak; külön komponensfájl betöltésekor a szükséges foundation CSS-eket is be kell tölteni.
 
-Helyileg a `npm run publish` előbb parse-ol, majd publikál. A CI ugyanannak a pipeline-nak a már elkészült artifactját használja.
+A `tokens.css` továbbra is a közös `component/component.css` fájlt importálja. A korábbi betöltési mód és importálási sorrend megmarad; a külön komponensfájlokat igény szerint lehet használni. A CSS-artifact, a source commit és a default/profil publish a külön fájlokat is automatikusan tartalmazza. A parser minden futáskor újragenerálja a kimeneti könyvtárat, ezért a megszűnt komponensek fájljai nem maradnak benne. Token nélküli komponenshez nem készül külön fájl.
 
-Kötelező konfiguráció:
+## Publikálási cél: default és mentett profil
 
-- `TARGET_REPO_URL`: a cél GitLab repository hitelesített clone URL-je.
+A publish kétféle, előre konfigurált URL–token párt tud kiválasztani. A cél URL-je külön, látható változóban tárolható és javítható; a token CI-secretben tárolandó. A publish célválasztó paramétere csak a profilnév; az URL és a token a mentett konfigurációból érkezik. A `CREDENTIALS` értéke minden esetben **a nyers token**, nem JSON és nem hitelesítést tartalmazó URL.
 
-Opcionális konfiguráció:
+| Mód | URL | Token | Indításkor megadandó |
+|-----|-----|-------|---------------------|
+| Default | `DEFAULT_TARGET_REPO_URL` változó | `DEFAULT_TARGET_REPO_CREDENTIALS` secret | Üres profilnév |
+| Mentett profil, például `DEMO` | `DEMO_TARGET_REPO_URL` változó | `DEMO_TARGET_REPO_CREDENTIALS` secret | Profilnév: `DEMO` |
 
-- `TARGET_REPO_BRANCH` (alapérték: `IDS_CSS`; ha még nem létezik, a publish job létrehozza)
-- `TARGET_CSS_PATH` (alapérték: `projects/demo/src/assets/ids_css`)
-- `TARGET_CHECKOUT_DIR` (alapérték: `target-repo`)
-- `TARGET_COMMIT_MESSAGE`
-- `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`
+A default vagy profil opcionális HTTPS-felhasználóneve a `DEFAULT_TARGET_REPO_USERNAME`, illetve `<PROFIL>_TARGET_REPO_USERNAME` látható változóban adható meg. Ha a kiválasztott párhoz nincs felhasználónév megadva, az alapérték `git`; ez GitHub és GitLab personal access tokenekkel használható. Olyan tokennél, amely konkrét felhasználónevet igényel, add meg azt a kiválasztott cél saját username-mezőjében.
 
-A célrepo nincs beégetve sem a scriptbe, sem a pipeline-ba. A GitLab projekt **Settings > CI/CD > Variables** részében kell felvenni a `TARGET_REPO_URL` változót. Ha az URL credentialt vagy deploy tokent tartalmaz, legyen **Masked** és szükség szerint **Protected**. Ugyanitt adható meg opcionálisan a `TARGET_REPO_BRANCH` és a `TARGET_CSS_PATH`. Valódi tokent nem szabad a repositoryba commitolni.
+### Alapértelmezett pár
 
-## IDS Styles token validáció
+A CI beállításaiban egyszer hozd létre:
 
-A `validate_ids_styles_tokens` job a generált komponens CSS-változókat hasonlítja össze az `ids-styles` lefordított CSS-ében található komponens-token hivatkozásokkal. Az összehasonlítás kizárólag a `--ids-comp-*` tokenekre terjed ki; a komponens tokenek alapjául szolgáló `base` és `smc` tokenek kimaradnak a darabszámokból és mindkét eltéréslistából. A job az `ids-styles` saját buildjét futtatja, ezért a Sass ciklusok és interpolációk már feloldott CSS-ként kerülnek az ellenőrzésbe.
-
-### Futtatás GitLabon
-
-1. Nyisd meg a projekt **Build > Pipelines** oldalát, majd kattints a **New pipeline** gombra.
-2. A **Run for branch name or tag** mezőben válaszd ki ennek a token-store repositorynak azt a branchét vagy tagjét, amelynek a tokenjeit ellenőrizni szeretnéd. Ez nem az `ids-styles` verziója.
-3. Az `IDS_STYLES_REF` változót kétféleképpen adhatod meg:
-    - **Projektváltozóként** a **Settings > CI/CD > Variables** résznél.
-    - **Csak az aktuális pipeline futtatásához** a **New pipeline** oldalon, a **Variables** szekcióban:
-        - **Variable type:** `Variable`
-        - **Variable key:** `IDS_STYLES_REF`
-        - **Variable value:** az `ids-styles` kívánt branche, tagje vagy commit SHA-ja, például `main` vagy `0.0.74`.
-4. Kattints a **New pipeline** gombra a pipeline létrehozásához.
-5. A létrejött pipeline-ban indítsd el a `validate_ids_styles_tokens` manuális jobot a **Run** vagy a lejátszás ikonra kattintva.
-
-A job kimenete tartalmazza mindkét eltérés rendezett listáját. A `token-diff-report.json` machine-readable artifact sikeres és sikertelen validáció után is letölthető a job oldaláról.
-
-### A riport listáinak értelmezése
-
-A validátor mindkét oldalon egyedi tokennevekből álló halmazt készít, ezért ugyanaz a token akkor is csak egyszer szerepel a riportban, ha több komponens vagy CSS-fájl hivatkozik rá. A listák alfabetikusan rendezettek, és csak `--ids-comp-*` komponens tokeneket tartalmaznak.
-
-#### Az IDS Styles hivatkozik rá, de hiányzik a generált CSS-ből
-
-A piros, `Referenced by ids-styles but missing from generated CSS` lista olyan komponens tokeneket tartalmaz, amelyekre a kiválasztott `ids-styles` ref lefordított CSS-e `var(--ids-comp-...)` formában hivatkozik, de az aktuális token-store forrásokból generált CSS nem definiálja őket.
-
-Például az IDS Styles tartalmazza ezt:
-
-```css
-.ids-button {
-  height: var(--ids-comp-button-size-height-compact);
-}
+```text
+Változó: DEFAULT_TARGET_REPO_URL = https://github.com/example/frontend.git
+Secret:  DEFAULT_TARGET_REPO_CREDENTIALS = a célhoz tartozó nyers token
 ```
 
-de a generált CSS-ből hiányzik ez a definíció:
+Ha publishkor a profilnév üres, ide történik a publikálás. A default párt mentett profil kiválasztásakor nem szükséges konfigurálni.
 
-```css
-:root {
-  --ids-comp-button-size-height-compact: 32px;
-}
+### Több mentett profil
+
+Minden profilhoz önálló változó–secret párost hozz létre, például:
+
+```text
+Változó: DEMO_TARGET_REPO_URL = https://github.com/example/demo-frontend.git
+Secret:  DEMO_TARGET_REPO_CREDENTIALS = a demo repository tokenje
+
+Változó: SANDBOX_TARGET_REPO_URL = https://gitlab.example.com/team/sandbox-frontend.git
+Secret:  SANDBOX_TARGET_REPO_CREDENTIALS = a sandbox repository tokenje
 ```
 
-Ilyenkor a CSS-változó nem oldható fel a generált tokenkészletből. Ez jelenthet hiányzó vagy átnevezett tokent, elavult IDS Styles hivatkozást, illetve egymással nem kompatibilis token-store és IDS Styles verziót. Ha ez a lista nem üres, a validációs job hibával leáll.
+Indításkor csak a `DEMO` vagy `SANDBOX` profilnevet add meg. A profilnév nagybetűvel kezdődik, és kizárólag `A–Z`, `0–9`, `_` karaktereket tartalmazhat. A rendszer a név alapján választja ki a hozzá tartozó URL-t és tokent. Új profilhoz elég létrehozni a megfelelő CI-változókat és secreteket; nincs központi profillista, kódmódosítás vagy URL-allowlist. A profil URL-je a token újramentése nélkül módosítható.
 
-#### Generált, de az IDS Styles által közvetlenül nem hivatkozott
+### Kiválasztási szabályok és hibák
 
-A cián, `Defined in generated CSS but not directly referenced by ids-styles` lista olyan komponens tokeneket tartalmaz, amelyeket az aktuális token-store sikeresen legenerált, de a kiválasztott `ids-styles` ref lefordított CSS-ében nincs rájuk közvetlen `var(--ids-comp-...)` hivatkozás.
+- Üres profilnév: a teljes default pár használatos.
+- Megadott profil: kizárólag annak saját URL-je, tokenje és opcionális felhasználóneve használatos.
+- Ismeretlen, hibás nevű vagy hiányosan konfigurált profil: hiba, default fallback nélkül.
+- Hibás URL, hiányzó token vagy elégtelen Git-jogosultság: a publish hibával leáll.
 
-Például a generált CSS tartalmazza ezt:
+Nincs credential fallback a default és a profilok között, és sikertelen Git-művelet után nincs másik hitelesítéssel történő újrapróbálkozás. A default vagy mentett profil konfigurációjában tetszőleges érvényes HTTPS clone URL használható. Az URL nem tartalmazhat tokent, jelszót, felhasználónevet, queryt vagy fragmentet. A script a szolgáltató clone útvonalát használja, nem fűz hozzá automatikusan `.git` végződést.
 
-```css
-:root {
-  --ids-comp-button-size-height-extra-large: 48px;
-}
+### Hitelesítés, naplózás és megmaradó beállítások
+
+A kiválasztott tokennek a konkrét célrepositoryhoz olvasási és írási jog kell. A Git-szerver ellenőrzi a tényleges jogosultságot; a token létezése önmagában nem jogosít pushra. A célbranch védelmi szabályait is be kell tartani.
+
+A naplóban látható a választott mód, a profil neve, a cél-URL, a credential-beállítás **neve**, a branch és a CSS-könyvtár. A token értékét a script nem naplózza. A token a Git credential protokollján, csak a kiválasztott HTTPS hosthoz és repositoryútvonalhoz kerül átadásra; nem kerül clone URL-be, Git-konfigurációba vagy parancssori argumentumba. A HTTP-átirányítások, örökölt credential helperek, HTTP fejlécek, URL-átírások és Git trace kimenet tiltottak. A TLS-ellenőrzés aktív; belső CA esetén `GIT_SSL_CAINFO` használható. A célrepository nyers hibakimenete helyett a script ellenőrzési útmutatót adó hibaüzenetet ír.
+
+| Változó | Alapérték / jelentés |
+|---------|---------------------|
+| `TARGET_REPO_BRANCH` | `IDS_CSS`; szükség esetén létrejön a branch |
+| `TARGET_CSS_PATH` | `projects/demo/src/assets/ids_css` |
+| `TARGET_CHECKOUT_DIR` | `target-repo`; biztonságos relatív helyi könyvtár |
+| `TARGET_COMMIT_MESSAGE` | `chore(tokens): update generated CSS` |
+| `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL` | GitLab/helyi fallback: `token-pipeline`, `token-pipeline@example.invalid`; GitHubon a workflow botazonosítót ad |
+
+Ezek a beállítások mindkét célválasztási módban azonosak. A script csak a cél CSS-könyvtár tartalmát cseréli le. Más célfájlok megmaradnak; azonos CSS esetén nincs új commit vagy push. A checkout- és célútvonalak nem vezethetnek ki a repositoryból és nem haladhatnak át szimbolikus linken.
+
+### Átállás a korábbi publish-konfigurációról
+
+Ez a célválasztás **nem visszafelé kompatibilis**. A korábbi beállítások nem szolgálnak fallbackként.
+
+| Korábbi beállítás | Új beállítás |
+|------------------|-------------|
+| `TARGET_REPO_URL` | `DEFAULT_TARGET_REPO_URL`, csak a hitelesítés nélküli URL |
+| `TARGET_REPO_TOKEN`, illetve az URL-be ágyazott token | `DEFAULT_TARGET_REPO_CREDENTIALS`, csak a nyers token |
+| `TARGET_REPO_USERNAME`, illetve az URL-be ágyazott username | Opcionális `DEFAULT_TARGET_REPO_USERNAME` |
+| `TARGET_REPO_CREDENTIALS` JSON | A token a default vagy a választott profil `…_CREDENTIALS` secretjébe; az URL külön látható változóba kerül |
+| `PUBLISH_TARGET_REPO_URL`, GitHubon `target_repo_url` | Előre konfigurált mentett profil választása |
+
+Az új beállítások létrehozása után a régi cél- és hitelesítési változók törölhetők. A mentett default- és profiltokeneket a CI secretkezelőjében add meg. Az új publish-párok HTTPS URL-t és tokent használnak; a korábbi SSH-default konfigurációt is erre kell átállítani. Az `IDS_STYLES_REF`, a parser és a forrásrepository CSS-visszacommitolásának beállításai változatlanok.
+
+## GitHub Actions használata
+
+Az **Actions → Token Pipeline → Run workflow** felületen az `operation` mező választja ki a műveletet:
+
+| `operation` | Lefutó jobok |
+|-------------|-------------|
+| `generate` (default) | **Generate CSS** |
+| `validate` | **Generate CSS** → **Validate tokens against ids-styles** |
+| `publish` | **Generate CSS** → **Publish CSS** |
+| Repository push | Csak **Generate CSS**, az eddigi útvonalszűrés szerint |
+
+A push esemény akkor sem indíthat publish-t, ha a `publish-tokens` Environmentben nincsenek Required reviewers. A publish feltétele egyszerre a `workflow_dispatch` esemény és az explicit `publish` művelet. A validáció és a publish között nincs függőség; egyik nem indítja el a másikat. A kiválasztott művelet ugyanazon futtatás `ids_css` artifactját kapja meg.
+
+### CSS-generálás
+
+1. Pushold a tokenek vagy feldolgozó scriptek módosítását; a workflow automatikusan indul az érintett útvonalakon.
+2. Kézi futtatáshoz válaszd a **Run workflow** gombot, a token-store forrásbranchét/tagjét, majd az `operation: generate` értéket.
+3. A **Generate CSS** job logjában látszik a feldolgozás eredménye. A generált CSS az adott futtatás **Artifacts → ids_css** csomagjából tölthető le, hét napig.
+
+A generált CSS forrásbranchre történő visszacommitolásának meglévő logikája megmarad; ez különbözik a célrepositoryba történő publikálástól. A GitHub `github.ref_protected` jelzése alapján védett branchre (a ruleseteket is beleértve), illetve tagre nem történik visszacommitolás; ehhez külön branchvédelmi API-jogosultság nem szükséges.
+
+### Külön tokenvalidáció
+
+1. **Run workflow**, majd válaszd a token-store ellenőrizendő forrásbranchét/tagjét és az `operation: validate` értéket.
+2. Az `ids_styles_ref` mezőbe az **ids-styles** branchét, tagjét vagy commit SHA-ját írd, például `main` vagy `0.0.74`. Ez kizárólag a token-összehasonlítást befolyásolja; sem a publish célját, sem a publikálást nem módosítja.
+3. Üres mezőnél a repository `IDS_STYLES_REF` változója használatos. Ha az sem létezik, a validáció hibával és hibariporttal áll le.
+4. Indítsd el a futtatást. Ha a `validate-ids-styles` Environmenthez jóváhagyás tartozik, a **Review deployments** felületen hagyd jóvá.
+5. A **Validate tokens against ids-styles** job logjában találod az eltéréseket. Az **Artifacts → token-diff-report** csomagban van a `token-diff-report.json`, sikeres és sikertelen összehasonlítás után is, hét napig. CSS-generálási vagy artifact-letöltési hiba esetén a validátor nem jut el az összehasonlításig.
+
+### Manuális CSS-publish: default vagy mentett profil
+
+1. Nyisd meg az **Actions → Token Pipeline → Run workflow** felületet, válaszd a token-store forrásbranchét/tagjét és az `operation: publish` értéket.
+2. Válassz az alábbi kitöltések közül:
+
+   | Mód | `target_profile` |
+   |-----|------------------|
+   | Default | üres |
+   | Mentett profil | például `DEMO` |
+
+3. Kattints a **Run workflow** gombra. Az URL-t és a tokent a rendszer a kiválasztott cél előre konfigurált Variable/Secret párjából olvassa.
+4. A CSS-generálás után, ha van Environment-jóváhagyás, a **Review deployments** felületen hagyd jóvá a `publish-tokens` telepítést.
+5. A **Publish CSS** job a futtatás saját CSS-artifactját publikálja. A job naplója mutatja a módot, profilnevet, URL-t, credential-beállítás nevét, branchet és célkönyvtárat.
+6. A job logjában találod a sikert, a változatlan CSS jelzését vagy a hibát. Sikertelen publish hibás jobot és hibás workflow-futtatást eredményez. Az `ids_styles_ref` ehhez nem szükséges.
+
+### Szükséges GitHub-beállítások
+
+A **Settings → Secrets and variables → Actions** felületen, vagy a `publish-tokens` Environmentben:
+
+- **Variables:** `DEFAULT_TARGET_REPO_URL`, illetve minden mentett profil saját `<PROFIL>_TARGET_REPO_URL` értéke. Az opcionális username ugyanilyen előtagú `…_TARGET_REPO_USERNAME` változó. Az URL-eket ne Secretként tárold, mert a workflow a `vars` kontextusból olvassa őket.
+- **Secrets:** `DEFAULT_TARGET_REPO_CREDENTIALS`, illetve például `DEMO_TARGET_REPO_CREDENTIALS`, `SANDBOX_TARGET_REPO_CREDENTIALS`. Mindegyik érték a megfelelő repository nyers tokenje. A defaultot és minden profilt csak egyszer kell felvenni; publishkor nem kell átírni a meglévő secreteket.
+- **További Variables:** `IDS_STYLES_REF`, valamint a közös `TARGET_REPO_BRANCH`, `TARGET_CSS_PATH`, checkout-, commit- és szerzőbeállítások.
+- **Environments:** `publish-tokens` és `validate-ids-styles`. A Required reviewers további jóváhagyást adhatnak; a manuális publish működése nem függ ettől. A publishhoz használt mentett secreteket célszerű a `publish-tokens` Environmenthez és ellenőrzött branchekhez kötni.
+- A forrásrepositoryba történő CSS-visszacommitoláshoz a `parse_tokens` job `GITHUB_TOKEN`-je `contents: write` jogot kér; a célrepository tokenje ettől külön működik.
+
+GitHub célhoz a kiválasztott repositoryhoz jogosított fine-grained PAT **Contents: Read and write** joggal, vagy megfelelő GitHub App token használható. A szervezeti jóváhagyási és SSO-szabályoknak is teljesülniük kell. GitLab célhoz GitLab által kiadott, megfelelően korlátozott token kell.
+
+A profilnév alapján a workflow csak a kiválasztott URL-változót és credential-secretet adja át a közös publish scriptnek. A mentett profil URL-jének javításához a megfelelő Variable-t módosítsd, a tokent tartalmazó Secretet nem kell újramenteni.
+
+A **Run workflow** felület a default branchre felkerült workflow-hoz érhető el; a helyi fájlmódosítás önmagában nem frissíti ezt a felületet.
+
+## GitLab CI/CD használata
+
+| Job | Indítás | CSS forrása |
+|-----|---------|-------------|
+| `parse_tokens` | Automatikus push-pipeline vagy **New pipeline** | A pipeline token-store checkoutjából generál |
+| `validate_ids_styles_tokens` | Csak webes pipeline-ban, külön manuális job | Saját checkoutjából generál, majd összehasonlít |
+| `publish_tokens` | Mindig külön manuális job | A saját pipeline `parse_tokens` artifactja |
+
+### CSS-generálás
+
+1. A tokeneket vagy feldolgozó scripteket érintő push az eddigi `workflow.rules.changes` alapján indít pipeline-t.
+2. Manuálisan: **Build → Pipelines → New pipeline**, válaszd a token-store forrásbranchét/tagjét, majd **New pipeline**.
+3. A `parse_tokens` automatikusan lefut. Logját a job oldalán, a CSS-t az ottani **Job artifacts / Browse / Download** felületen találod, hét napig.
+4. A meglévő `commit-generated-css.sh` a nem védett, időközben el nem mozdult forrásbranchre továbbra is visszacommitolhatja a CSS-t. Ez nem célrepository-publish.
+
+### Külön tokenvalidáció
+
+1. Hozz létre egy webes pipeline-t a **New pipeline** felületen.
+2. Az `IDS_STYLES_REF` pipeline-változóban add meg az ellenőrizni kívánt **ids-styles** branchét, tagjét vagy SHA-ját. Ha nem írod felül, a projektben beállított `IDS_STYLES_REF` marad érvényes.
+3. A pipeline-ban nyisd meg a `validate_ids_styles_tokens` jobot. Az `IDS_STYLES_REF` itt is megadható jobváltozóként, majd **Run job**. Gyorsindításhoz a lejátszás ikon az aktuális változóértékekkel indít.
+4. A validáció nem indít publish-t. Hiányzó token vagy futtatási hiba esetén a job hibás (`allow_failure: false`). A pipeline emiatt blokkoltnak/hibásnak látszhat; a publish csak a `parse_tokens` jobtól függ, nem a validációtól.
+5. Az eltérések a job logjában, a `token-diff-report.json` a job artifactjai között találhatók. A riportot a runner hibás validáció után is feltölti, ha a validátor létre tudta hozni; megőrzés hét nap.
+
+### Manuális CSS-publish: default vagy mentett profil
+
+1. Nyisd meg azt a pipeline-t, amelynek a CSS-ét publikálni szeretnéd. A `parse_tokens` jobnak sikeresen le kell futnia.
+2. Kattints a **`publish_tokens` job nevére**. Paraméterek megadásához a job adatlapját nyisd meg, ne a közvetlen lejátszás ikont.
+3. A változóűrlapot az alábbiak szerint töltsd ki:
+
+   | Mód | Jobváltozók |
+   |-----|-------------|
+   | Default | Hagyd üresen a `PUBLISH_TARGET_PROFILE` értékét |
+   | Mentett profil | `PUBLISH_TARGET_PROFILE = DEMO` |
+
+4. Kattints a **Run job** gombra. Az URL és a token a kiválasztott cél előre konfigurált CI/CD-változóiból érkezik; a tokent ne add meg a manuális űrlapon.
+5. A job a saját pipeline-jának CSS-artifactját publikálja a közös branch- és könyvtárbeállításokkal. Lejárt artifact esetén indíts új CSS-generálást. Validáció indítása vagy sikere nem előfeltétel.
+6. A naplóban a választott mód, profilnév, URL, credential-beállítás neve, branch és célkönyvtár látható. A script a token értékét nem írja ki. Az eredményt és a hibát is itt találod.
+
+A `PUBLISH_TARGET_PROFILE` a **New pipeline** oldalon is megadható; a joboldali érték az adott publish-futtatásra felülírhatja. Default publishhoz hagyd üresen a profilnevet; retrykor ellenőrizd az esetleg előre kitöltött korábbi profilválasztást.
+
+A meglévő `allow_failure: true` megmarad: sikertelen publish esetén a job hibát jelez, de a teljes pipeline figyelmeztetéssel is befejeződhet. Mindig a publish job eredményét ellenőrizd. A manuális változóűrlap működését a [GitLab dokumentációja](https://docs.gitlab.com/ci/jobs/job_control/) részletezi.
+
+### Szükséges GitLab-beállítások
+
+A **Settings → CI/CD → Variables** alatt:
+
+- **Default:** `DEFAULT_TARGET_REPO_URL` látható változó és `DEFAULT_TARGET_REPO_CREDENTIALS` **Masked**, lehetőség szerint **Hidden** tokenváltozó.
+- **Profilok:** például `DEMO_TARGET_REPO_URL` látható változó és `DEMO_TARGET_REPO_CREDENTIALS` **Masked**, lehetőség szerint **Hidden** tokenváltozó. További profilhoz ugyanilyen névpárt hozz létre; nincs szükség `.gitlab-ci.yml` módosítására.
+- **Username:** szükség esetén `DEFAULT_TARGET_REPO_USERNAME` vagy `<PROFIL>_TARGET_REPO_USERNAME`, látható változóként.
+- A tokenváltozók típusa **Variable** legyen, ne **File**. Kapcsold ki az **Expand variable reference** opciót, hogy a token pontos értéke érkezzen meg. Environment scope lehet `publish-tokens`. **Protected** változó csak megfelelő védett refen érhető el.
+- `IDS_STYLES_REF`: a validáció alapértelmezett ids-styles branch/tag/SHA értéke. Publishhoz nem szükséges.
+- A közös `TARGET_REPO_BRANCH`, `TARGET_CSS_PATH`, checkout-, commit- és szerzőváltozók továbbra is használhatók.
+
+GitLab célhoz a kiválasztott projekt(ek)re korlátozott project/group access token vagy megfelelő PAT használható **write_repository** jogosultsággal. A hagyományos GitLab deploy token `read_repository` joga nem elegendő Git-pushhoz; a konkrét deploy/bot username szükség esetén külön beállítandó. A védett célbranch szabályai is engedjék az írást. GitHub célhoz annak saját tokenje kell. A forrásprojekt `CI_JOB_TOKEN`-je nem szolgál célhitelesítési fallbackként.
+
+A mentett pár URL-jét a megfelelő látható `…_TARGET_REPO_URL` változóban javítsd; a tokenhez nem kell hozzányúlni. A default- és profilbeállításokat megbízható maintainerek kezeljék. A manuális jobváltozók felülírhatják a projektváltozókat, ezért a publish futtatásának joga és a védett secretekhez való hozzáférés csak megbízható szerepköröknél legyen. Használj protected Environmentet, ha a GitLab kiadás támogatja; egyébként Protected secreteket és megfelelően korlátozott védett forrásbrancheket. A pipeline-változók minimum szerepköre önmagában nem védi a manuális jobfelülírásokat. [GitLab CI/CD változók](https://docs.gitlab.com/ci/variables/)
+
+A saját forrásrepositoryba történő CSS-visszacommitoláshoz továbbra is külön engedélyezni kell a projekt saját `CI_JOB_TOKEN` push-jogát, vagy használható a meglévő masked `SELF_REPO_URL`. Ez a célrepositoryba történő publikálástól külön működik.
+
+## A tokenvalidáció riportjának értelmezése
+
+Az összehasonlítás továbbra is kizárólag `--ids-comp-*` komponens-tokeneket vizsgál. A base és smc tokenek nem szerepelnek a darabszámokban vagy eltéréslistákban. A validátor a kiválasztott `ids-styles` refet checkoutolja, telepíti annak függőségeit, és az ottani build által készített CSS-ből olvassa ki a hivatkozásokat; a Sass ciklusok és interpolációk így már feloldottak.
+
+- **Referenced by ids-styles but missing from generated CSS:** az ids-styles hivatkozik a tokenre, de nincs a generált CSS-ben. Nem üres lista esetén a validáció hibás.
+- **Defined in generated CSS but not directly referenced by ids-styles:** definiált token, amelyre a kiválasztott ids-styles build nem hivatkozik közvetlenül. Információs lista; önmagában nem buktatja el a validációt, és nem bizonyítja, hogy a token minden fogyasztónál használatlan.
+
+Mindkét lista egyedi neveket tartalmaz, alfabetikus sorrendben. Branch megadásával annak aktuális állapotát, taggel egy kiadást, teljes commit SHA-val pontosan rögzített verziót vizsgálhatsz. Hibás/hiányzó ref vagy buildhiba esetén a riport `error` mezővel készül el, és a validációs job hibával áll le.
+
+## Tesztelés és ellenőrzési korlátok
+
+```bash
+npm ci
+npm test
 ```
 
-de az IDS Styles lefordított CSS-e sehol nem tartalmazza ezt:
+Az `npm run test:parse` külön is futtatható: rögzített fixture-ön ellenőrzi a hat korábbi CSS-fájl változatlan tartalmát, a teljes komponensnevek elkülönítését, a duplikációk kezelését és az elavult fájlok takarítását. A repository aktuális tokenjeivel is végigfuttatja a parsert, majd ellenőrzi, hogy a külön fájlok együttesen pontosan a közös `component.css` kulcs–érték párjait tartalmazzák, és a validátor eredménye nem változik.
 
-```css
-var(--ids-comp-button-size-height-extra-large)
-```
+A tesztcsomag TypeScript-ellenőrzést, a default/profil módok kiválasztását és hibáit, valódi ideiglenes Git-repositorykon clone/commit/push műveleteket mindkét módban, Git credential-protokolltesztet, a workflow-feltételek helyi kiértékelését és a validátor CLI-jának sikeres/hibás végigfuttatását tartalmazza. A validációs teszt egy lokális ids-styles fixture tagjét checkoutolja és buildeli; nem igényli az éles ids-styles repositoryt. A publish-tesztek kizárólag ideiglenes lokális célokra írnak. `file://` vagy abszolút helyi cél csak CI-n kívül, hitelesítési adatok nélkül használható; CI-ben ezek tiltottak.
 
-Ez önmagában nem jelenti azt, hogy a token biztosan használatlan. Lehet, hogy egy másik IDS Styles verzió, egy még nem implementált komponens vagy variáns, illetve az IDS Styles-on kívüli fogyasztó használja. Ez a lista ezért csak információs: a tartalma nem buktatja el a jobot.
-
-### Az IDS Styles verziójának megadása
-
-Az `IDS_STYLES_REF` értéke az `ids-styles` repository bármely elérhető Git branch-, tag- vagy commit SHA-azonosítója lehet:
-
-- Branch, például `main`: minden futás az adott branch aktuális commitját ellenőrzi.
-- Tag, például `0.0.74`: egy kiadáshoz rögzített, reprodukálható ellenőrzést ad. A megadott tagnek léteznie kell az `ids-styles` repositoryban.
-- Commit SHA, például `32d74f7a082cda8eda3d72bef07c3ebc8b19a109`: pontosan a megadott commitot ellenőrzi. Reprodukálható futtatáshoz a teljes SHA használata ajánlott.
-
-A ref kétféleképpen konfigurálható:
-
-1. Tartós alapértékként a projekt **Settings > CI/CD > Variables** részében add hozzá az `IDS_STYLES_REF` változót. Például:
-
-   ```text
-   Key: IDS_STYLES_REF
-   Value: main
-   ```
-
-2. Egyetlen futtatáshoz a **New pipeline** oldalon, a pipeline-változók között add meg vagy írd felül az értékét. Például egy taggel:
-
-   ```text
-   Key: IDS_STYLES_REF
-   Value: 0.0.74
-   ```
-
-Az aktuális pipeline-hoz megadott változóval a tartós projektbeállítás futtatásonként felülírható. Ha az `IDS_STYLES_REF` nincs beállítva, vagy a megadott ref nem checkoutolható, a validáció egyértelmű hibaüzenettel leáll.
-
-## GitHub Actions pipeline és publikálás
-
-A repository GitLab mellett GitHub Actions-ön is futtatható, a `.github/workflows/tokens.yml` workflow-val. Ez **kizárólag adapter réteg**: ugyanazokat az npm scripteket és `scripts/` alatti fájlokat hívja, mint a GitLab pipeline, így a két platform mindig azonos üzleti logikát futtat. A `.gitlab-ci.yml` és a GitLab-specifikus beállítások ettől függetlenül, változatlanul működnek tovább.
-
-### Jobok és trigger-viselkedés
-
-| Job | Trigger | GitLab megfelelő |
-|-----|---------|-------------------|
-| `parse_tokens` | Automatikus push-ra (`foundations/**`, `components/**`, `scripts/**`, stb.) és manuális `workflow_dispatch`-re is | `parse_tokens` (automatikus) |
-| `validate_ids_styles_tokens` | Csak manuális `workflow_dispatch` futtatáson jelenik meg, és a `validate-ids-styles` Environmenthez van kötve | `validate_ids_styles_tokens` (csak web forrás, manuális) |
-| `publish_tokens` | Mindig a `publish-tokens` Environment jóváhagyásához kötött, push és `workflow_dispatch` esetén is | `publish_tokens` (`when: manual`) |
-
-A `parse_tokens` job a generált CSS-t — a GitLab `commit-generated-css.sh` scripttel megegyező logikával — visszacommitolja a forrás branch-re, kivéve ha a branch védett (ezt a job a GitHub API-n keresztül próbálja megállapítani; bizonytalan esetben a job biztonságból védettnek tekinti a branch-et, és kihagyja a visszacommitolást).
-
-### Szükséges GitHub beállítások
-
-1. **Environments létrehozása jóváhagyással** (Settings > Environments):
-   - `publish-tokens` — állíts be **Required reviewers**-t, hogy a publikálás valóban emberi jóváhagyáshoz legyen kötve (ez felel meg a GitLab `when: manual` gombjának).
-   - `validate-ids-styles` — opcionálisan szintén elláthatod jóváhagyással.
-
-2. **Repository Secrets** (Settings > Secrets and variables > Actions > Secrets):
-   - `TARGET_REPO_URL` — a cél repository hitelesített clone URL-je (pl. GitHub esetén egy fine-grained personal access token-nel vagy deploy key-jel).
-
-3. **Repository Variables** (Settings > Secrets and variables > Actions > Variables) — mind opcionális, a GitLab CI/CD változóival megegyező névvel és alapértékkel:
-   - `TARGET_REPO_BRANCH` (alapérték a scriptben: `IDS_CSS`)
-   - `TARGET_CSS_PATH` (alapérték: `projects/demo/src/assets/ids_css`)
-   - `TARGET_CHECKOUT_DIR` (alapérték: `target-repo`)
-   - `TARGET_COMMIT_MESSAGE`
-   - `GIT_AUTHOR_NAME` (GitHub alapérték: `github-actions[bot]`)
-   - `GIT_AUTHOR_EMAIL` (GitHub alapérték: `41898282+github-actions[bot]@users.noreply.github.com`)
-   - `IDS_STYLES_REF` — a `validate_ids_styles_tokens` jobhoz; egyetlen futtatásra felülírható a **Run workflow** ablak `ids_styles_ref` mezőjében is.
-
-4. **`GITHUB_TOKEN` jogosultság a saját repóba történő visszacommitoláshoz**: a `parse_tokens` job a beépített `GITHUB_TOKEN`-t használja push-hoz (job-szintű `permissions: contents: write`). Ha a szervezetben alapból csak olvasási jogú `GITHUB_TOKEN`-t engedélyeznek, ellenőrizd a **Settings > Actions > General > Workflow permissions** beállítást, vagy engedélyezd explicit "Read and write permissions"-t.
-
-### Futtatás GitHubon
-
-1. Nyisd meg a **Actions** fület, válaszd a **Token Pipeline** workflow-t.
-2. Kattints a **Run workflow** gombra a kívánt branch-en; opcionálisan add meg az `ids_styles_ref` inputot.
-3. A `parse_tokens` job automatikusan lefut. A `validate_ids_styles_tokens` és `publish_tokens` jobok a hozzájuk rendelt Environment jóváhagyása után indulnak — ezt az Actions futtatás oldaláról, a **Review deployments** gombbal lehet engedélyezni.
-
-Helyileg ugyanazok az `npm run parse`, `npm run validate:ids-styles` és `npm run publish` parancsok használhatók, mint a GitLab esetén — a két CI/CD platform között nincs eltérés a tényleges pipeline-logikában.
-
+A helyi workflow-tesztek nem helyettesítik a GitHub Actions runner és a GitLab scheduler tényleges futtatását. A távoli Environment-szabályok, projektjogosultságok, tokenek és a konkrét GitLab-verzió adminbeállításai csak a megfelelő platformon ellenőrizhetők. Éles publish nem része a tesztelésnek. Bevezetéskor külön tesztcélrepositoryval ellenőrizd a szervezeti jogosultságokat és a felületi jóváhagyást.
