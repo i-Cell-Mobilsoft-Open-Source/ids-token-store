@@ -1,0 +1,6 @@
+:root {
+  --ids-comp-progressbar-size-gap-comfortable: var(--ids-smc-reference-container-gap-8);
+  --ids-comp-progressbar-size-gap-compact: var(--ids-smc-reference-container-gap-4);
+  --ids-comp-progressbar-size-gap-dense: var(--ids-smc-reference-container-gap-4);
+  --ids-comp-progressbar-size-gap-spacious: var(--ids-smc-reference-container-gap-8);
+}

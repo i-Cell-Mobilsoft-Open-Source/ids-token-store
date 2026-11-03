@@ -447,7 +447,7 @@ function generateSmcReferenceCss() {
 // ─── component.css (new Style Dictionary format) ─────────────────────────────
 
 function generateComponentCss() {
-  const allEntries: TokenEntry[] = [];
+  const allEntries: (TokenEntry & { component: string })[] = [];
   const processedDirs = new Set<string>();
 
   if (!fs.existsSync(COMPONENTS_DIR)) { console.warn('components directory not found'); return; }
@@ -475,7 +475,7 @@ function generateComponentCss() {
         for (const token of tokens) {
           const cssVar = `--ids-comp-${sanitizedCompName}-${token.path.join('-')}`;
           const resolvedVal = resolveStyleDictRef(token.value);
-          allEntries.push({ cssVar, value: resolvedVal, resolved: true });
+          allEntries.push({ cssVar, value: resolvedVal, resolved: true, component: sanitizedCompName });
         }
       }
     }
@@ -497,7 +497,7 @@ function generateComponentCss() {
         for (const token of tokens) {
           const cssVar = `--ids-comp-${sanitizedCompName}-${token.path.join('-')}-${sizeName}`;
           const resolvedVal = resolveStyleDictRef(token.value);
-          allEntries.push({ cssVar, value: resolvedVal, resolved: true });
+          allEntries.push({ cssVar, value: resolvedVal, resolved: true, component: sanitizedCompName });
         }
       }
     }
@@ -517,6 +517,22 @@ function generateComponentCss() {
   ensureDir(path.dirname(outPath));
   fs.writeFileSync(outPath, output, 'utf-8');
   console.log(`✓ component/component.css (${resolved}/${deduped.length} tokens)`);
+
+  // Use the same deduplicated entries and their full source component names.
+  // Parsing the variable prefix would merge names such as icon and icon-button.
+  const entriesByComponent = new Map<string, TokenEntry[]>();
+  for (const entry of deduped) {
+    if (!entriesByComponent.has(entry.component)) entriesByComponent.set(entry.component, []);
+    entriesByComponent.get(entry.component)!.push(entry);
+  }
+  for (const [component, entries] of entriesByComponent) {
+    fs.writeFileSync(
+      path.join(OUTPUT_DIR, 'component', `ids-${component}.css`),
+      buildCssBlock(':root', entries),
+      'utf-8',
+    );
+  }
+  console.log(`✓ component/ids-*.css (${entriesByComponent.size} components)`);
 }
 
 // ─── tokens.css ───────────────────────────────────────────────────────────────
