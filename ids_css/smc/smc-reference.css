@@ -1728,6 +1728,7 @@
   --ids-smc-reference-container-size-width-1000: var(--ids-base-dimension-10000);
   --ids-smc-reference-container-size-width-112: var(--ids-base-dimension-1120);
   --ids-smc-reference-container-size-width-12: var(--ids-base-dimension-120);
+  --ids-smc-reference-container-size-width-1200: var(--ids-base-dimension-12000);
   --ids-smc-reference-container-size-width-128: var(--ids-base-dimension-1280);
   --ids-smc-reference-container-size-width-16: var(--ids-base-dimension-160);
   --ids-smc-reference-container-size-width-2: var(--ids-base-dimension-20);
