@@ -144,6 +144,10 @@
               "value": "{base.dimension.10000}",
               "type": "number"
             },
+            "1200": {
+              "value": "{base.dimension.12000}",
+              "type": "number"
+            },
             "none": {
               "value": "{base.dimension.0}",
               "type": "number"
