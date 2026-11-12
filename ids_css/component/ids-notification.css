@@ -134,10 +134,10 @@
   --ids-comp-notification-message-size-gap-compact: var(--ids-smc-reference-container-gap-6);
   --ids-comp-notification-message-size-gap-dense: var(--ids-smc-reference-container-gap-6);
   --ids-comp-notification-message-size-gap-spacious: var(--ids-smc-reference-container-gap-6);
-  --ids-comp-notification-message-size-max-width-comfortable: var(--ids-smc-reference-container-size-width-400);
-  --ids-comp-notification-message-size-max-width-compact: var(--ids-smc-reference-container-size-width-400);
-  --ids-comp-notification-message-size-max-width-dense: var(--ids-smc-reference-container-size-width-400);
-  --ids-comp-notification-message-size-max-width-spacious: var(--ids-smc-reference-container-size-width-400);
+  --ids-comp-notification-message-size-max-width-comfortable: var(--ids-smc-reference-container-size-width-1200);
+  --ids-comp-notification-message-size-max-width-compact: var(--ids-smc-reference-container-size-width-1200);
+  --ids-comp-notification-message-size-max-width-dense: var(--ids-smc-reference-container-size-width-1200);
+  --ids-comp-notification-message-size-max-width-spacious: var(--ids-smc-reference-container-size-width-1200);
   --ids-comp-notification-message-size-min-height-comfortable: var(--ids-smc-reference-container-size-height-24);
   --ids-comp-notification-message-size-min-height-compact: var(--ids-smc-reference-container-size-height-24);
   --ids-comp-notification-message-size-min-height-dense: var(--ids-smc-reference-container-size-height-24);

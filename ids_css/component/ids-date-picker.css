@@ -1,4 +1,8 @@
 :root {
+  --ids-comp-date-picker-calendar-button-not-current-month-typography-font-weight-comfortable: var(--ids-smc-reference-typography-font-weight-light);
+  --ids-comp-date-picker-calendar-button-not-current-month-typography-font-weight-compact: var(--ids-smc-reference-typography-font-weight-light);
+  --ids-comp-date-picker-calendar-button-not-current-month-typography-font-weight-dense: var(--ids-smc-reference-typography-font-weight-light);
+  --ids-comp-date-picker-calendar-button-not-current-month-typography-font-weight-spacious: var(--ids-smc-reference-typography-font-weight-light);
   --ids-comp-date-picker-calendar-button-selected-color-bg-surface-default: var(--ids-smc-reference-container-color-bg-primary-default);
   --ids-comp-date-picker-calendar-button-selected-color-bg-surface-disabled: var(--ids-smc-reference-container-color-bg-primary-default);
   --ids-comp-date-picker-calendar-button-selected-color-bg-surface-focused: var(--ids-smc-reference-container-color-bg-primary-darker-10);
@@ -42,10 +46,10 @@
   --ids-comp-date-picker-calendar-button-typography-font-size-compact: var(--ids-smc-reference-typography-font-size-16);
   --ids-comp-date-picker-calendar-button-typography-font-size-dense: var(--ids-smc-reference-typography-font-size-12);
   --ids-comp-date-picker-calendar-button-typography-font-size-spacious: var(--ids-smc-reference-typography-font-size-24);
-  --ids-comp-date-picker-calendar-button-typography-font-weight-comfortable: var(--ids-smc-reference-typography-font-weight-regular);
-  --ids-comp-date-picker-calendar-button-typography-font-weight-compact: var(--ids-smc-reference-typography-font-weight-regular);
-  --ids-comp-date-picker-calendar-button-typography-font-weight-dense: var(--ids-smc-reference-typography-font-weight-regular);
-  --ids-comp-date-picker-calendar-button-typography-font-weight-spacious: var(--ids-smc-reference-typography-font-weight-regular);
+  --ids-comp-date-picker-calendar-button-typography-font-weight-comfortable: var(--ids-smc-reference-typography-font-weight-medium);
+  --ids-comp-date-picker-calendar-button-typography-font-weight-compact: var(--ids-smc-reference-typography-font-weight-medium);
+  --ids-comp-date-picker-calendar-button-typography-font-weight-dense: var(--ids-smc-reference-typography-font-weight-medium);
+  --ids-comp-date-picker-calendar-button-typography-font-weight-spacious: var(--ids-smc-reference-typography-font-weight-medium);
   --ids-comp-date-picker-calendar-button-typography-letter-spacing-comfortable: var(--ids-smc-reference-typography-letter-spacing-default);
   --ids-comp-date-picker-calendar-button-typography-letter-spacing-compact: var(--ids-smc-reference-typography-letter-spacing-default);
   --ids-comp-date-picker-calendar-button-typography-letter-spacing-dense: var(--ids-smc-reference-typography-letter-spacing-default);
@@ -64,11 +68,11 @@
   --ids-comp-date-picker-calendar-button-unselected-color-border-surface-focused: var(--ids-smc-reference-container-color-border-surface-transparent-0);
   --ids-comp-date-picker-calendar-button-unselected-color-border-surface-hovered: var(--ids-smc-reference-container-color-border-surface-transparent-0);
   --ids-comp-date-picker-calendar-button-unselected-color-border-surface-pressed: var(--ids-smc-reference-container-color-border-surface-transparent-0);
-  --ids-comp-date-picker-calendar-button-unselected-color-fg-surface-default: var(--ids-smc-reference-container-color-fg-surface-darker-50);
+  --ids-comp-date-picker-calendar-button-unselected-color-fg-surface-default: var(--ids-smc-reference-container-color-fg-surface-darker-70);
   --ids-comp-date-picker-calendar-button-unselected-color-fg-surface-disabled: var(--ids-smc-reference-container-color-bg-surface-transparent-500);
-  --ids-comp-date-picker-calendar-button-unselected-color-fg-surface-focused: var(--ids-smc-reference-container-color-fg-surface-darker-70);
-  --ids-comp-date-picker-calendar-button-unselected-color-fg-surface-hovered: var(--ids-smc-reference-container-color-fg-surface-darker-70);
-  --ids-comp-date-picker-calendar-button-unselected-color-fg-surface-pressed: var(--ids-smc-reference-container-color-fg-surface-darker-70);
+  --ids-comp-date-picker-calendar-button-unselected-color-fg-surface-focused: var(--ids-smc-reference-container-color-fg-surface-darker-80);
+  --ids-comp-date-picker-calendar-button-unselected-color-fg-surface-hovered: var(--ids-smc-reference-container-color-fg-surface-darker-80);
+  --ids-comp-date-picker-calendar-button-unselected-color-fg-surface-pressed: var(--ids-smc-reference-container-color-fg-surface-darker-80);
   --ids-comp-date-picker-calendar-button-unselected-current-date-color-bg-surface-default: var(--ids-smc-reference-container-color-bg-surface-transparent-0);
   --ids-comp-date-picker-calendar-button-unselected-current-date-color-bg-surface-disabled: var(--ids-smc-reference-container-color-bg-surface-transparent-0);
   --ids-comp-date-picker-calendar-button-unselected-current-date-color-bg-surface-focused: var(--ids-smc-reference-container-color-bg-surface-transparent-100);
@@ -84,6 +88,7 @@
   --ids-comp-date-picker-calendar-button-unselected-current-date-color-fg-surface-focused: var(--ids-smc-reference-container-color-fg-surface-darker-70);
   --ids-comp-date-picker-calendar-button-unselected-current-date-color-fg-surface-hovered: var(--ids-smc-reference-container-color-fg-surface-darker-70);
   --ids-comp-date-picker-calendar-button-unselected-current-date-color-fg-surface-pressed: var(--ids-smc-reference-container-color-fg-surface-darker-70);
+  --ids-comp-date-picker-calendar-button-unselected-not-current-mont-color-fg-surface-default: var(--ids-smc-reference-container-color-fg-surface-darker-50);
   --ids-comp-date-picker-calendar-cell-size-border-radius-comfortable: var(--ids-smc-reference-container-border-radius-full);
   --ids-comp-date-picker-calendar-cell-size-border-radius-compact: var(--ids-smc-reference-container-border-radius-full);
   --ids-comp-date-picker-calendar-cell-size-border-radius-dense: var(--ids-smc-reference-container-border-radius-full);
