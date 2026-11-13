@@ -6,7 +6,7 @@
         "type": "number"
       },
       "padding-x": {
-        "value": "{smc.reference.container.padding.24}",
+        "value": "{smc.reference.container.padding.20}",
         "type": "number"
       },
       "min-height": {
@@ -98,11 +98,11 @@
     },
     "size": {
       "padding-x": {
-        "value": "{smc.reference.container.padding.none}",
+        "value": "{smc.reference.container.padding.6}",
         "type": "number"
       },
       "padding-y": {
-        "value": "{smc.reference.container.padding.none}",
+        "value": "{smc.reference.container.padding.2}",
         "type": "number"
       },
       "gap": {
@@ -113,11 +113,11 @@
   },
   "footer": {
     "padding-x": {
-      "value": "{smc.reference.container.padding.none}",
+      "value": "{smc.reference.container.padding.6}",
       "type": "number"
     },
     "padding-y": {
-      "value": "{smc.reference.container.padding.none}",
+      "value": "{smc.reference.container.padding.2}",
       "type": "number"
     },
     "gap": {
@@ -133,7 +133,7 @@
           "type": "number"
         },
         "padding-x": {
-          "value": "{smc.reference.container.padding.none}",
+          "value": "{smc.reference.container.padding.6}",
           "type": "number"
         },
         "border-width": {
@@ -145,11 +145,11 @@
     "fixed": {
       "size": {
         "padding-x": {
-          "value": "{smc.reference.container.padding.none}",
+          "value": "{smc.reference.container.padding.6}",
           "type": "number"
         },
         "padding-y": {
-          "value": "{smc.reference.container.padding.none}",
+          "value": "{smc.reference.container.padding.6}",
           "type": "number"
         }
       }
