@@ -641,15 +641,33 @@
       }
     }
   },
-  "tabgroup": {
+  "tabpanel": {
     "color": {
       "border": {
-        "bg": {
+        "surface": {
           "default": {
-            "value": "{smc.reference.container.color.bg.surface.transparent.0}",
+            "value": "{smc.reference.container.color.border.surface.transparent.0}",
             "type": "color"
           }
-        },
+        }
+      },
+      "bg": {
+        "default": {
+          "value": "{smc.reference.container.color.bg.surface.transparent.0}",
+          "type": "color"
+        }
+      }
+    }
+  },
+  "tabgroup": {
+    "color": {
+      "bg": {
+        "default": {
+          "value": "{smc.reference.container.color.bg.surface.transparent.0}",
+          "type": "color"
+        }
+      },
+      "border": {
         "default": {
           "value": "{smc.reference.container.color.border.surface.darker-20}",
           "type": "color"
@@ -671,24 +689,6 @@
             "value": "{smc.reference.container.color.border.surface.darker-20}",
             "type": "color"
           }
-        }
-      }
-    }
-  },
-  "tabpanel": {
-    "color": {
-      "border": {
-        "surface": {
-          "default": {
-            "value": "{smc.reference.container.color.border.surface.transparent.0}",
-            "type": "color"
-          }
-        }
-      },
-      "bg": {
-        "default": {
-          "value": "{smc.reference.container.color.bg.surface.transparent.0}",
-          "type": "color"
         }
       }
     }

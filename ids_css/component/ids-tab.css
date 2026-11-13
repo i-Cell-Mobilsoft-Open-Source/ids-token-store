@@ -273,7 +273,7 @@
   --ids-comp-tab-item-standard-unselected-fg-label-surface-focused: var(--ids-smc-reference-container-color-fg-surface-darker-95);
   --ids-comp-tab-item-standard-unselected-fg-label-surface-hovered: var(--ids-smc-reference-container-color-fg-surface-darker-95);
   --ids-comp-tab-item-standard-unselected-fg-label-surface-pressed: var(--ids-smc-reference-container-color-fg-surface-darker-95);
-  --ids-comp-tab-tabgroup-color-border-bg-default: var(--ids-smc-reference-container-color-bg-surface-transparent-0);
+  --ids-comp-tab-tabgroup-color-bg-default: var(--ids-smc-reference-container-color-bg-surface-transparent-0);
   --ids-comp-tab-tabgroup-color-border-default: var(--ids-smc-reference-container-color-border-surface-darker-20);
   --ids-comp-tab-tabgroup-color-border-light-default: var(--ids-smc-reference-container-color-border-surface-darker-50);
   --ids-comp-tab-tabgroup-color-border-primary-default: var(--ids-smc-reference-container-color-border-surface-darker-20);
