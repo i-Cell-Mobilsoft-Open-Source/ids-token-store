@@ -2525,7 +2525,7 @@
   --ids-comp-date-picker-calendar-button-unselected-current-date-color-fg-surface-focused: var(--ids-smc-reference-container-color-fg-surface-darker-70);
   --ids-comp-date-picker-calendar-button-unselected-current-date-color-fg-surface-hovered: var(--ids-smc-reference-container-color-fg-surface-darker-70);
   --ids-comp-date-picker-calendar-button-unselected-current-date-color-fg-surface-pressed: var(--ids-smc-reference-container-color-fg-surface-darker-70);
-  --ids-comp-date-picker-calendar-button-unselected-not-current-mont-color-fg-surface-default: var(--ids-smc-reference-container-color-fg-surface-darker-50);
+  --ids-comp-date-picker-calendar-button-unselected-not-current-month-color-fg-surface-default: var(--ids-smc-reference-container-color-fg-surface-darker-50);
   --ids-comp-date-picker-calendar-cell-size-border-radius-comfortable: var(--ids-smc-reference-container-border-radius-full);
   --ids-comp-date-picker-calendar-cell-size-border-radius-compact: var(--ids-smc-reference-container-border-radius-full);
   --ids-comp-date-picker-calendar-cell-size-border-radius-dense: var(--ids-smc-reference-container-border-radius-full);
