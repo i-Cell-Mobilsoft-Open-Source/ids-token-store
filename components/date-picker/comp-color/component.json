@@ -151,7 +151,7 @@
           }
         }
       },
-      "not-current-mont": {
+      "not-current-month": {
         "color": {
           "fg": {
             "surface": {
