@@ -444,7 +444,7 @@
                 "type": "color"
               },
               "default": {
-                "value": "{smc.reference.container.color.fg.surface.lighter-10}",
+                "value": "{smc.reference.container.color.fg.surface.darker-80}",
                 "type": "color"
               }
             },

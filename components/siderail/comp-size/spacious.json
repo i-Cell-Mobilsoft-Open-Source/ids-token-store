@@ -1,0 +1,216 @@
+{
+  "container": {
+    "top": {
+      "size": {
+        "gap": {
+          "value": "{smc.reference.container.gap.16}",
+          "type": "number"
+        },
+        "collapsed": {
+          "padding-top": {
+            "value": "{smc.reference.container.padding.none}",
+            "type": "number"
+          },
+          "padding-x": {
+            "value": "{smc.reference.container.padding.20}",
+            "type": "number"
+          },
+          "padding-bottom": {
+            "value": "{smc.reference.container.padding.32}",
+            "type": "number"
+          }
+        },
+        "expanded": {
+          "padding-x": {
+            "value": "{smc.reference.container.padding.24}",
+            "type": "number"
+          },
+          "padding-bottom": {
+            "value": "{smc.reference.container.padding.32}",
+            "type": "number"
+          },
+          "padding-top": {
+            "value": "{smc.reference.container.padding.none}",
+            "type": "number"
+          }
+        }
+      }
+    },
+    "size": {
+      "expanded": {
+        "padding-y": {
+          "value": "{smc.reference.container.padding.24}",
+          "type": "number"
+        },
+        "width": {
+          "value": "{smc.reference.container.size.width.256}",
+          "type": "number"
+        },
+        "max-width": {
+          "value": "{smc.reference.container.size.width.256}",
+          "type": "number"
+        },
+        "padding-x": {
+          "value": "{smc.reference.container.padding.none}",
+          "type": "number"
+        }
+      },
+      "collapsed": {
+        "padding-x": {
+          "value": "{smc.reference.container.padding.none}",
+          "type": "number"
+        },
+        "min-width": {
+          "value": "{smc.reference.container.size.width.72}",
+          "type": "number"
+        },
+        "width": {
+          "value": "{smc.reference.container.size.width.96}",
+          "type": "number"
+        },
+        "padding-y": {
+          "value": "{smc.reference.container.padding.24}",
+          "type": "number"
+        }
+      },
+      "border-width": {
+        "value": "{smc.reference.container.border-width.sm}",
+        "type": "number"
+      },
+      "gap": {
+        "value": "{smc.reference.container.gap.none}",
+        "type": "number"
+      },
+      "border-radius": {
+        "value": "{smc.reference.container.border-radius.none}",
+        "type": "number"
+      },
+      "min-height": {
+        "value": "{smc.reference.container.size.height.256}",
+        "type": "number"
+      }
+    },
+    "footer": {
+      "size": {
+        "gap": {
+          "value": "{smc.reference.container.gap.16}",
+          "type": "number"
+        },
+        "expanded": {
+          "padding-x": {
+            "value": "{smc.reference.container.padding.24}",
+            "type": "number"
+          },
+          "padding-top": {
+            "value": "{smc.reference.container.padding.32}",
+            "type": "number"
+          },
+          "padding-bottom": {
+            "value": "{smc.reference.container.padding.none}",
+            "type": "number"
+          }
+        },
+        "collapsed": {
+          "padding-x": {
+            "value": "{smc.reference.container.padding.20}",
+            "type": "number"
+          },
+          "padding-top": {
+            "value": "{smc.reference.container.padding.32}",
+            "type": "number"
+          },
+          "padding-bottom": {
+            "value": "{smc.reference.container.padding.none}",
+            "type": "number"
+          }
+        }
+      },
+      "avatar": {
+        "size": {
+          "height": {
+            "value": "{smc.reference.container.size.height.56}",
+            "type": "number"
+          },
+          "width": {
+            "value": "{smc.reference.container.size.width.56}",
+            "type": "number"
+          }
+        }
+      }
+    },
+    "content": {
+      "fixed": {
+        "size": {
+          "expanded": {
+            "gap": {
+              "value": "{smc.reference.container.gap.none}",
+              "type": "number"
+            },
+            "padding-x": {
+              "value": "{smc.reference.container.padding.24}",
+              "type": "number"
+            },
+            "padding-y": {
+              "value": "{smc.reference.container.padding.none}",
+              "type": "number"
+            }
+          },
+          "collapsed": {
+            "gap": {
+              "value": "{smc.reference.container.gap.none}",
+              "type": "number"
+            },
+            "padding-x": {
+              "value": "{smc.reference.container.padding.20}",
+              "type": "number"
+            },
+            "padding-y": {
+              "value": "{smc.reference.container.padding.none}",
+              "type": "number"
+            }
+          }
+        }
+      },
+      "scrollable": {
+        "size": {
+          "collapsed": {
+            "gap": {
+              "value": "{smc.reference.container.gap.4}",
+              "type": "number"
+            },
+            "padding-x": {
+              "value": "{smc.reference.container.padding.20}",
+              "type": "number"
+            },
+            "padding-y": {
+              "value": "{smc.reference.container.padding.none}",
+              "type": "number"
+            }
+          },
+          "expanded": {
+            "gap": {
+              "value": "{smc.reference.container.gap.4}",
+              "type": "number"
+            },
+            "padding-x": {
+              "value": "{smc.reference.container.padding.24}",
+              "type": "number"
+            },
+            "padding-y": {
+              "value": "{smc.reference.container.padding.none}",
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  },
+  "backdrop": {
+    "size": {
+      "opacity": {
+        "value": "{smc.reference.container.color.opacity.backdrop-percentage}",
+        "type": "number"
+      }
+    }
+  }
+}

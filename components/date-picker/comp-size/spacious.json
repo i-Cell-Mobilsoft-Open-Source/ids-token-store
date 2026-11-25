@@ -65,12 +65,20 @@
           "type": "number"
         },
         "font-weight": {
-          "value": "{smc.reference.typography.font-weight.Regular}",
+          "value": "{smc.reference.typography.font-weight.Medium}",
           "type": "number"
         },
         "line-height": {
           "value": "{smc.reference.typography.line-height.24}",
           "type": "number"
+        }
+      },
+      "not-current-month": {
+        "typography": {
+          "font-weight": {
+            "value": "{smc.reference.typography.font-weight.Light}",
+            "type": "number"
+          }
         }
       }
     },

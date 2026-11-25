@@ -23,7 +23,7 @@
   },
   "typography": {
     "font-weight": {
-      "value": "{smc.reference.typography.font-weight.Regular}",
+      "value": "{smc.reference.typography.font-weight.SemiBold}",
       "type": "number"
     },
     "letter-spacing": {
@@ -31,7 +31,7 @@
       "type": "number"
     },
     "line-height": {
-      "value": "{smc.reference.typography.line-height.16}",
+      "value": "{smc.reference.typography.line-height.20}",
       "type": "number"
     },
     "font-size": {
