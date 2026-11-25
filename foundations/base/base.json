@@ -2911,6 +2911,10 @@
         "value": 1000,
         "type": "number"
       },
+      "12000": {
+        "value": 1200,
+        "type": "number"
+      },
       "-120": {
         "value": -12,
         "type": "number"
