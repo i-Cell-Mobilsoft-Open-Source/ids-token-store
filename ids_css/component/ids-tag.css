@@ -348,7 +348,7 @@
   --ids-comp-tag-size-border-radius-comfortable: var(--ids-smc-reference-container-border-radius-xs);
   --ids-comp-tag-size-border-radius-compact: var(--ids-smc-reference-container-border-radius-2xs);
   --ids-comp-tag-size-border-radius-dense: var(--ids-smc-reference-container-border-radius-4xs);
-  --ids-comp-tag-size-border-radius-spacious: var(--ids-smc-reference-container-border-radius-full);
+  --ids-comp-tag-size-border-radius-spacious: var(--ids-smc-reference-container-border-radius-md);
   --ids-comp-tag-size-border-width-comfortable: var(--ids-smc-reference-container-border-width-sm);
   --ids-comp-tag-size-border-width-compact: var(--ids-smc-reference-container-border-width-sm);
   --ids-comp-tag-size-border-width-dense: var(--ids-smc-reference-container-border-width-sm);

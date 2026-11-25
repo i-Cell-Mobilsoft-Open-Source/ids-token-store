@@ -67,16 +67,16 @@
   --ids-comp-message-typography-font-size-compact: var(--ids-smc-reference-typography-font-size-12);
   --ids-comp-message-typography-font-size-dense: var(--ids-smc-reference-typography-font-size-12);
   --ids-comp-message-typography-font-size-spacious: var(--ids-smc-reference-typography-font-size-18);
-  --ids-comp-message-typography-font-weight-comfortable: var(--ids-smc-reference-typography-font-weight-regular);
-  --ids-comp-message-typography-font-weight-compact: var(--ids-smc-reference-typography-font-weight-regular);
-  --ids-comp-message-typography-font-weight-dense: var(--ids-smc-reference-typography-font-weight-regular);
-  --ids-comp-message-typography-font-weight-spacious: var(--ids-smc-reference-typography-font-weight-regular);
+  --ids-comp-message-typography-font-weight-comfortable: var(--ids-smc-reference-typography-font-weight-semibold);
+  --ids-comp-message-typography-font-weight-compact: var(--ids-smc-reference-typography-font-weight-semibold);
+  --ids-comp-message-typography-font-weight-dense: var(--ids-smc-reference-typography-font-weight-semibold);
+  --ids-comp-message-typography-font-weight-spacious: var(--ids-smc-reference-typography-font-weight-semibold);
   --ids-comp-message-typography-letter-spacing-comfortable: var(--ids-smc-reference-typography-letter-spacing-default);
   --ids-comp-message-typography-letter-spacing-compact: var(--ids-smc-reference-typography-letter-spacing-default);
   --ids-comp-message-typography-letter-spacing-dense: var(--ids-smc-reference-typography-letter-spacing-default);
   --ids-comp-message-typography-letter-spacing-spacious: var(--ids-smc-reference-typography-letter-spacing-default);
-  --ids-comp-message-typography-line-height-comfortable: var(--ids-smc-reference-typography-line-height-16);
-  --ids-comp-message-typography-line-height-compact: var(--ids-smc-reference-typography-line-height-12);
-  --ids-comp-message-typography-line-height-dense: var(--ids-smc-reference-typography-line-height-12);
-  --ids-comp-message-typography-line-height-spacious: var(--ids-smc-reference-typography-line-height-18);
+  --ids-comp-message-typography-line-height-comfortable: var(--ids-smc-reference-typography-line-height-20);
+  --ids-comp-message-typography-line-height-compact: var(--ids-smc-reference-typography-line-height-16);
+  --ids-comp-message-typography-line-height-dense: var(--ids-smc-reference-typography-line-height-14);
+  --ids-comp-message-typography-line-height-spacious: var(--ids-smc-reference-typography-line-height-22);
 }

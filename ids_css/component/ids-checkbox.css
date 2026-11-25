@@ -236,7 +236,7 @@
   --ids-comp-checkbox-input-selected-color-fg-icon-dark-focused: var(--ids-smc-reference-container-color-fg-surface-lighter-10);
   --ids-comp-checkbox-input-selected-color-fg-icon-dark-hovered: var(--ids-smc-reference-container-color-fg-surface-lighter-10);
   --ids-comp-checkbox-input-selected-color-fg-icon-dark-pressed: var(--ids-smc-reference-container-color-fg-surface-lighter-10);
-  --ids-comp-checkbox-input-selected-color-fg-icon-light-default: var(--ids-smc-reference-container-color-fg-surface-lighter-10);
+  --ids-comp-checkbox-input-selected-color-fg-icon-light-default: var(--ids-smc-reference-container-color-fg-surface-darker-80);
   --ids-comp-checkbox-input-selected-color-fg-icon-light-disabled: var(--ids-smc-reference-container-color-fg-disabled-default);
   --ids-comp-checkbox-input-selected-color-fg-icon-light-error-default: var(--ids-smc-reference-container-color-fg-error-default);
   --ids-comp-checkbox-input-selected-color-fg-icon-light-error-focused: var(--ids-smc-reference-container-color-fg-error-default);
